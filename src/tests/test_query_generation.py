@@ -28,6 +28,6 @@ claim = Claim(45)
 queries1 = query_execution_obj.get_queries_from_claim(claim)
 
 print(queries1)
-if len(queries1) > 0:
-    print(queries1[0].query)
+for i, q in enumerate(queries1):
+    print(q.query)
 # print(globals())
