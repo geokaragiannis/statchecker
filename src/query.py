@@ -39,15 +39,19 @@ class Query:
             print("could not execute")
             return
 
-    def get_single_query_result(self):
+    def get_single_column_query_result(self):
         """
-        if self.result has only one element, return this element
-        :return: the single element in the self.result DataFrame
+        if self.result has only one column, return a list of values from this column
+        :return (list of Value Obj.): the single column in the self.result DataFrame as a list of Value objects
         """
         if self.result_df is None:
             return
-        if self.result_df.shape != (1, 1):
-            self.logger.warning("Getting single result from a query with more than one result. Query: {}".format(self.query))
+        if self.result_df.shape[1] != 1:
+            self.logger.warning("Getting result from a query with more than one column. Query: {}".format(self.query))
             return
 
-        return Value(self.result_df.values.tolist()[0][0])
+        # self.result_df.values.tolist() is a list of 1-element lists, which contain the column elements
+        return [Value(v[0]) for v in self.result_df.values.tolist()]
+
+    def __str__(self):
+        return "Query: {} \n type: {}".format(self.query, self.type)

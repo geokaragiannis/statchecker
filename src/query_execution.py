@@ -32,18 +32,20 @@ class QueryExecution:
     def _compare_claim_with_query(self, claim, query):
         """
         Compares if the claim and the query result are close in value.
-        !!Note: We assume that the query_result DataFrame has only one element.
+        !!Note: We assume that the query_result DataFrame has only one column
         :param claim (Claim Object):
         :param query (Query Object):
         :return: True/False
         """
         # Get the Value object for the result of the query
-        query_value = query.get_single_query_result()
-        if query_value is None:
+        query_value_list = query.get_single_column_query_result()
+        if query_value_list is None:
             return False
 
-        if claim.claim_value.new_value in query_value.round():
-            return True
+        # if at least one element of the query_value_list is approximately the same as the claim_value, return True
+        for query_value in query_value_list:
+            if claim.claim_value.new_value in query_value.round():
+                return True
 
         return False
 

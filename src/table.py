@@ -7,17 +7,18 @@ import pandas as pd
 
 class Table:
 
-    def __init__(self, path, name, metadata=None):
+    def __init__(self, path, name, delimiter=",", metadata=None):
         """
 
         :param path (str): the path to read the table from
         :param name (str): name of the table
+        :param delimiter (str): delimiter to read pandas DataFrame
         :param metadata (dict): extra info about the table
         """
         self.path = path
         self.name = name
         self.metadata = metadata
-        self.df = pd.read_csv(self.path)
+        self.df = pd.read_csv(self.path, delimiter=delimiter)
         self.df.rename(columns={"Unnamed: 0": "row_name"}, inplace=True)
         self.df.name = self.name
 

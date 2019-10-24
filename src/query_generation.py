@@ -36,10 +36,9 @@ class QueryGeneration:
         columns = list(table.df.columns)
         rows = list(table.df.row_name)
         for column in columns:
-            for row in rows:
-                query_text = "SELECT t.'{}' from {} as t WHERE t.'row_name' == '{}'".format(column, table.df.name, row)
-                query = Query(query_text, type="existence", table=table)
-                existence_queries.append(query)
+            query_text = "SELECT t.'{}' from {} as t".format(column, table.df.name)
+            query = Query(query_text, type="existence", table=table)
+            existence_queries.append(query)
 
         self.logger.info("Created {} existence queries for table {}".format(len(existence_queries), table.df.name))
         self.candidate_queries += existence_queries
@@ -56,10 +55,9 @@ class QueryGeneration:
         rows = list(table.df.row_name)
         column_tuples = self._get_column_tuples(columns)
         for column_tuple in column_tuples:
-            for row in rows:
-                query_text = "SELECT 100.0*(t.'{}' - t.'{}')/t.'{}' from {} as t WHERE t.'row_name' == '{}'".format(column_tuple[1], column_tuple[0], column_tuple[0], table.df.name, row)
-                query = Query(query_text, type="percentage_increase", table=table)
-                percentage_increase_queries.append(query)
+            query_text = "SELECT 100.0*(t.'{}' - t.'{}')/t.'{}' from {} as t".format(column_tuple[1], column_tuple[0], column_tuple[0], table.df.name)
+            query = Query(query_text, type="percentage_increase", table=table)
+            percentage_increase_queries.append(query)
 
         self.logger.info("Created {} percentage increase queries for table {}".format(len(percentage_increase_queries), table.df.name))
         self.candidate_queries += percentage_increase_queries
@@ -76,10 +74,9 @@ class QueryGeneration:
         rows = list(table.df.row_name)
         column_tuples = self._get_column_tuples(columns)
         for column_tuple in column_tuples:
-            for row in rows:
-                query_text = "SELECT 100.0*(t.'{}' - t.'{}')/t.'{}' from {} as t WHERE t.'row_name' == '{}'".format(column_tuple[0], column_tuple[1], column_tuple[1], table.df.name, row)
-                query = Query(query_text, type="percentage_decrease", table=table)
-                percentage_decrease_queries.append(query)
+            query_text = "SELECT 100.0*(t.'{}' - t.'{}')/t.'{}' from {} as t".format(column_tuple[0], column_tuple[1], column_tuple[1], table.df.name)
+            query = Query(query_text, type="percentage_decrease", table=table)
+            percentage_decrease_queries.append(query)
 
         self.logger.info("Created {} percentage decrease queries for table {}".format(len(percentage_decrease_queries), table.df.name))
         self.candidate_queries += percentage_decrease_queries
@@ -99,7 +96,6 @@ class QueryGeneration:
             for a in t[1:]:
                 tuple_list.append((first_item, a))
         return tuple_list
-
 
     def __str__(self):
         s = ""
