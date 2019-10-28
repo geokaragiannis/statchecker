@@ -4,6 +4,7 @@ Class which holds information about a claim value or a result of a query
 
 import math
 import numpy as np
+import warnings
 
 
 class Value:
@@ -13,6 +14,7 @@ class Value:
 
         :param raw_value: The initial value passed. E.g: it could be 11.0
         """
+        warnings.filterwarnings("error")
         self.raw_value = raw_value
         # float, string, int, etc.
         self.instance = None
@@ -43,6 +45,8 @@ class Value:
                 self.new_value = int(self.new_value)
             else:
                 self.instance = float
+                # for now we round to 3 decimal places
+                self.new_value = round(self.raw_value, 3)
 
         self._get_num_digits()
 
@@ -87,12 +91,16 @@ class Value:
     @staticmethod
     def _round_int_helper(value, n=10):
         """
-        rounds x to the nearest n
+        rounds x to the nearest n. Return None if overflow
         :param value (int): value to be rounded
         :param n (int): the nearest power of 10
-        :return (int): the rounded number
+        :return (int or None): the rounded number
         """
-        res = math.ceil(value / n) * n
+        try:
+            res = math.ceil(value / n) * n
+        except RuntimeWarning:
+            return None
+
         if (value % n < n / 2) and (value % n > 0):
             res -= n
         return res

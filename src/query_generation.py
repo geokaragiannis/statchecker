@@ -1,6 +1,8 @@
 """
 Generates a list of query objects based on the input tables
 """
+import itertools
+
 from src.query import Query
 import logging
 
@@ -15,6 +17,7 @@ class QueryGeneration:
         self.logger = logging.getLogger(__name__)
         self.tables = tables
         self.candidate_queries = []
+        self.operators = ["+", "-", "*", "/"]
 
     def generate_queries(self):
         """
@@ -22,9 +25,10 @@ class QueryGeneration:
         :return: a list of Query objects
         """
         for table in self.tables:
-            self._generate_existence_queries(table)
-            self._generate_percentage_increase_queries(table)
-            self._generate_percentage_decrease_queries(table)
+            self._generate_select_queries(table)
+            # self._generate_existence_queries(table)
+            # self._generate_percentage_increase_queries(table)
+            # self._generate_percentage_decrease_queries(table)
 
     def _generate_existence_queries(self, table):
         """
@@ -81,6 +85,48 @@ class QueryGeneration:
         self.logger.info("Created {} percentage decrease queries for table {}".format(len(percentage_decrease_queries), table.df.name))
         self.candidate_queries += percentage_decrease_queries
 
+    def _generate_select_queries(self, table):
+        """
+        Generates all possible queries between combinations of the numeric_columns
+        :param table (Table object): input table for which to generate the queries
+        :return: None
+        """
+        numeric_columns = self.format_columns(list(table.numeric_columns), table.df.name)
+        select_queries = []
+        # first take care of the single column queries
+        for column in numeric_columns:
+            query_text = "SELECT {} from {}".format(column, table.df.name)
+            query = Query(query_text, type="select_single_column", table=table)
+            select_queries.append(query)
+        # now compute every possible arithmetic combination of the numeric_columns and create the query
+        # go through every subset of the numeric_columns (col_num) and generate all permutations for this subset
+        # and combine this subset with all the permutations of the operators to end up with all the possible
+        # expressions
+        for col_num in range(2, len(numeric_columns) + 1):
+            perms = itertools.permutations(numeric_columns, col_num)
+            ops_permutations = self.get_operators_permutations(col_num - 1)
+            for perm in perms:
+                for op_comb in ops_permutations:
+                    expr = ""
+                    for j in range(0, len(perm) - 1):
+                        expr += perm[j] + op_comb[j]
+                        if j == len(perm) - 2:
+                            expr += perm[j + 1]
+                    query_text = "SELECT {} FROM {}".format(expr, table.df.name)
+                    query = Query(query_text, type="select_expression", table=table)
+                    select_queries.append(query)
+
+        self.logger.info("Created {} select queries for table {}".format(len(select_queries), table.df.name))
+        self.candidate_queries += select_queries
+
+    def get_operators_permutations(self, k):
+        """
+        Returns all possible permutations of the operators with length k WITH REPETITION . Example: ['+', '+', '-']
+        :param k (int): The length of each permutation. If k=2 then we get [['+', '+'], ['+', '-'], ..., ['-', '-']]
+        :return: list of lists
+        """
+        return list(itertools.product(self.operators, repeat=k))
+
     @staticmethod
     def _get_column_tuples(columns):
         """
@@ -96,6 +142,16 @@ class QueryGeneration:
             for a in t[1:]:
                 tuple_list.append((first_item, a))
         return tuple_list
+
+    @staticmethod
+    def format_columns(columns, table_name):
+        """
+        If table_name = 'table1' the return each column name as table1.'col_name'
+        :param columns:
+        :param table_name:
+        :return:
+        """
+        return [table_name + "." + "'" + col + "'" for col in columns]
 
     def __str__(self):
         s = ""

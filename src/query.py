@@ -11,7 +11,6 @@ class Query:
 
     def __init__(self, query, type=None, table=None):
         """
-
         :param query (str): the query text
         :param type (str): the type of the query (e.g existential or percentage_increase)
         """
@@ -20,6 +19,7 @@ class Query:
         self.type = type
         self.result_df = None
         self.table = table
+        self.not_executable = False
 
     def execute(self):
         """
@@ -36,7 +36,7 @@ class Query:
             self.result_df = ps.sqldf(self.query)
             return self.result_df
         except:
-            print("could not execute")
+            self.not_executable = True
             return
 
     def get_single_column_query_result(self):

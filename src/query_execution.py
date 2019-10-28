@@ -20,13 +20,16 @@ class QueryExecution:
         :return: a set of possible queries
         """
         possible_queries = []
-        for query in self.query_generation_obj.candidate_queries:
+        for i, query in enumerate(self.query_generation_obj.candidate_queries):
+            if i % 10000 == 0:
+                self.logger.info("Executing query number {} out of {}".
+                                 format(i, len(self.query_generation_obj.candidate_queries)))
             query_result_df = query.execute()
             if query_result_df is not None:
                 if self._compare_claim_with_query(claim, query):
                     possible_queries.append(query)
 
-        self.logger.info("Generated {} queries".format(len(possible_queries)))
+        self.logger.info("Resulting {} matched queries".format(len(possible_queries)))
         return possible_queries
 
     def _compare_claim_with_query(self, claim, query):
