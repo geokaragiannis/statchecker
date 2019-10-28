@@ -2,6 +2,7 @@
 Executes the generated queries and checks if a set of queries matches the input claims
 """
 import logging
+from collections import OrderedDict
 
 
 class QueryExecution:
@@ -31,6 +32,18 @@ class QueryExecution:
 
         self.logger.info("Resulting {} matched queries".format(len(possible_queries)))
         return possible_queries
+
+    def get_queries_from_claims(self, claims):
+        """
+        Executes the generated queries and checks for each claim if the claim_value is close to the result of the query
+        :param claims (list of Claims) : the input claims
+        :return (OrderedDict): for each claim a list of input queries
+        """
+        queries_dict = OrderedDict()
+        for claim in claims:
+            queries_dict[claim] = self.get_queries_from_claim(claim)
+        return queries_dict
+
 
     def _compare_claim_with_query(self, claim, query):
         """

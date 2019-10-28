@@ -26,7 +26,7 @@ class Query:
         executes the query and produce a dataframe of the result
         :return: DataFrame or None
         """
-        if self.result_df:
+        if self.result_df is not None:
             return self.result_df
         try:
             # create a variable with the same name as the table name, which points to the table dataframe

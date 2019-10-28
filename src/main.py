@@ -30,11 +30,20 @@ logger.info("Not executable queries: {}".format(not_exec_queries))
 
 query_execution_obj = QueryExecution(query_generation_obj)
 
-claim = Claim(26000)
+claim1 = Claim(26000)
+claim2 = Claim(0.45)
+claims = [claim1, claim2]
 
-queries1 = query_execution_obj.get_queries_from_claim(claim)
+queries_dict = query_execution_obj.get_queries_from_claims(claims)
 
-logger.info("Generated {} matched queries".format(len(queries1)))
 
-for i, q in enumerate(queries1):
-    logger.info("Matched queries: {}".format(q))
+num_generated_queries = 0
+for key, value in queries_dict.items():
+    num_generated_queries += len(value)
+    logger.info("Generated {} queries for claim {}".format(len(value), key.claim_value))
+    logger.info("Matched queries for claim {} :".format(key.claim_value))
+    for query in value:
+        logger.info("\t {}".format(query))
+    print("\n\n")
+
+logger.info("Generated {} matched queries".format(num_generated_queries))
