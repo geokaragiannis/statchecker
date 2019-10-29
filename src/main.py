@@ -42,8 +42,8 @@ for key, value in queries_dict.items():
     num_generated_queries += len(value)
     logger.info("Generated {} queries for claim {}".format(len(value), key.claim_value))
     logger.info("Matched queries for claim {} :".format(key.claim_value))
-    for query in value:
+    for query in sorted(value, key=lambda x: len(x.query)):
         logger.info("\t {}".format(query))
     print("\n\n")
 
-logger.info("Generated {} matched queries".format(num_generated_queries))
+logger.info("Generated {} matched queries total".format(num_generated_queries))
