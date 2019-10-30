@@ -2,8 +2,18 @@ import logging
 import logging.config
 import os
 import yaml
+import spacy
 
 from src.table import Table
+
+logger = logging.getLogger(__name__)
+NLP = None
+
+
+def get_nlp():
+    global NLP
+    NLP = NLP if NLP else spacy.load("en_core_web_md")
+    return NLP
 
 
 def set_up_logging():

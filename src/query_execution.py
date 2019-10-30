@@ -18,9 +18,8 @@ class QueryExecution:
         """
         Executes the generated queries and checks if the claim_value is close to the result of the query
         :param claim (Claim object): the input claim
-        :return: a set of possible queries
+        :return: None
         """
-        possible_queries = []
         for i, query in enumerate(self.query_generation_obj.candidate_queries):
             if i % 10000 == 0:
                 self.logger.info("Executing query number {} out of {}".
@@ -28,21 +27,18 @@ class QueryExecution:
             query_result_df = query.execute()
             if query_result_df is not None:
                 if self._compare_claim_with_query(claim, query):
-                    possible_queries.append(query)
+                    claim.add_query_to_list(query)
 
-        self.logger.info("Resulting {} matched queries".format(len(possible_queries)))
-        return possible_queries
+        self.logger.info("Resulting {} matched queries for claim {}".format(len(claim.queries_list), claim))
 
     def get_queries_from_claims(self, claims):
         """
         Executes the generated queries and checks for each claim if the claim_value is close to the result of the query
         :param claims (list of Claims) : the input claims
-        :return (OrderedDict): for each claim a list of input queries
+        :return None
         """
-        queries_dict = OrderedDict()
         for claim in claims:
-            queries_dict[claim] = self.get_queries_from_claim(claim)
-        return queries_dict
+            self.get_queries_from_claim(claim)
 
     def _compare_claim_with_query(self, claim, query):
         """

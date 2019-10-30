@@ -9,7 +9,7 @@ import logging
 
 class Query:
 
-    def __init__(self, query, type=None, table=None):
+    def __init__(self, query, expr=None, type=None, table=None):
         """
         :param query (str): the query text
         :param type (str): the type of the query (e.g existential or percentage_increase)
@@ -17,6 +17,7 @@ class Query:
         self.logger = logging.getLogger(__name__)
         self.query = query
         self.type = type
+        self.expr = expr
         self.result_df = None
         self.table = table
         self.not_executable = False

@@ -2,9 +2,10 @@
 Generates a list of query objects based on the input tables
 """
 import itertools
+import logging
 
 from src.query import Query
-import logging
+from src.expression import Expression
 
 
 class QueryGeneration:
@@ -92,30 +93,39 @@ class QueryGeneration:
         :param table (Table object): input table for which to generate the queries
         :return: None
         """
+        # dict that has for key the formatted numeric column and for value the formatted one
         numeric_columns = self.format_columns(list(table.numeric_columns), table.df.name)
         select_queries = []
         # first take care of the single column queries
-        for column in numeric_columns:
-            query_text = "SELECT {} from {}".format(column, table.df.name)
-            query = Query(query_text, type="select_single_column", table=table)
+        for formatted_column, column in numeric_columns.items():
+            expr = Expression()
+            expr.update_cols(column)
+            expr.expr_text = column
+            query_text = "SELECT {} from {}".format(formatted_column, table.df.name)
+            query = Query(query_text, expr=expr, type="select_single_column", table=table)
             select_queries.append(query)
         # now compute every possible arithmetic combination of the numeric_columns and create the query
         # go through every subset of the numeric_columns (col_num) and generate all permutations for this subset
         # and combine this subset with all the permutations of the operators to end up with all the possible
         # expressions
-        bound = self.complexity_bound if self.complexity_bound <= len(numeric_columns) else len(numeric_columns)
+        bound = self.complexity_bound
         for col_num in range(2, bound + 1):
             perms = itertools.product(numeric_columns, repeat=col_num)
             ops_permutations = self.get_operators_permutations(col_num - 1)
             for perm in perms:
-                for op_comb in ops_permutations:
-                    expr = ""
+                for op_perm in ops_permutations:
+                    expr_text = ""
+                    expr = Expression()
                     for j in range(0, len(perm) - 1):
-                        expr += perm[j] + op_comb[j]
+                        expr_text += perm[j] + op_perm[j]
+                        expr.update_cols(numeric_columns[perm[j]])
+                        expr.update_ops(op_perm[j])
                         if j == len(perm) - 2:
-                            expr += perm[j + 1]
-                    query_text = "SELECT {} FROM {}".format(expr, table.df.name)
-                    query = Query(query_text, type="select_expression", table=table)
+                            expr_text += perm[j + 1]
+                            expr.update_cols(numeric_columns[perm[j + 1]])
+                    expr.expr_text = expr_text
+                    query_text = "SELECT {} FROM {}".format(expr_text, table.df.name)
+                    query = Query(query_text, expr, type="select_expression", table=table)
                     select_queries.append(query)
 
         self.logger.info("Created {} select queries for table {}".format(len(select_queries), table.df.name))
@@ -153,7 +163,7 @@ class QueryGeneration:
         :param table_name:
         :return:
         """
-        return [table_name + "." + "'" + col + "'" for col in columns]
+        return {table_name + "." + "'" + col + "'": col for col in columns}
 
     def __str__(self):
         s = ""
