@@ -18,6 +18,7 @@ print(v5)
 v6 = Value(0)
 print(v6)
 
-v7 = Value(-112)
+v7 = Value(0.445306)
 
+print(v7)
 print(v7.round())
