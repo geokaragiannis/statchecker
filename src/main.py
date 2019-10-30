@@ -20,18 +20,18 @@ query_generation_obj.generate_queries()
 logger.info("num queries: {}".format(len(query_generation_obj.candidate_queries)))
 print("qqq: ", query_generation_obj.candidate_queries[0])
 
+query_execution_obj = QueryExecution(query_generation_obj)
+
 not_exec_queries = 0
 for query in query_generation_obj.candidate_queries:
     if query.not_executable:
-        print(query)
+        print("Not exec: ", query)
         not_exec_queries += 1
 
 logger.info("Not executable queries: {}".format(not_exec_queries))
 
-query_execution_obj = QueryExecution(query_generation_obj)
-
-claim1 = Claim(26000)
-claim2 = Claim(0.45)
+claim1 = Claim(37000)
+claim2 = Claim(45)
 claims = [claim1, claim2]
 
 queries_dict = query_execution_obj.get_queries_from_claims(claims)

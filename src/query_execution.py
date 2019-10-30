@@ -44,7 +44,6 @@ class QueryExecution:
             queries_dict[claim] = self.get_queries_from_claim(claim)
         return queries_dict
 
-
     def _compare_claim_with_query(self, claim, query):
         """
         Compares if the claim and the query result are close in value.

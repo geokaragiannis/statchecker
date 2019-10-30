@@ -9,7 +9,7 @@ import logging
 
 class QueryGeneration:
 
-    def __init__(self, tables):
+    def __init__(self, tables, complexity_bound=4):
         """
 
         :param tables (list of Table obj): tables for which to generate queries for
@@ -18,6 +18,7 @@ class QueryGeneration:
         self.tables = tables
         self.candidate_queries = []
         self.operators = ["+", "-", "*", "/"]
+        self.complexity_bound = complexity_bound
 
     def generate_queries(self):
         """
@@ -102,8 +103,9 @@ class QueryGeneration:
         # go through every subset of the numeric_columns (col_num) and generate all permutations for this subset
         # and combine this subset with all the permutations of the operators to end up with all the possible
         # expressions
-        for col_num in range(2, len(numeric_columns) + 1):
-            perms = itertools.permutations(numeric_columns, col_num)
+        bound = self.complexity_bound if self.complexity_bound <= len(numeric_columns) else len(numeric_columns)
+        for col_num in range(2, bound + 1):
+            perms = itertools.product(numeric_columns, repeat=col_num)
             ops_permutations = self.get_operators_permutations(col_num - 1)
             for perm in perms:
                 for op_comb in ops_permutations:
