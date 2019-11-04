@@ -1,10 +1,11 @@
 from src.parser.document_parser import DocumentParser
 from src.tokenizer.tokenizer_driver import TokenizerDriver
 from src.featurizer.feature_extractor import FeatureExtractor
+from src.cluster.kmeans_cluster import KmeansCluter
 
 import numpy as np
 from matplotlib import pyplot as plt
-from sklearn.cluster import KMeans
+
 
 REPORTS_PATH = "data/demo_reports/"
 
@@ -28,14 +29,20 @@ print("features 2 length: ", features[0].shape)
 print("Features: ")
 print(features[:5])
 
-wcss = []
-for i in range(22, 26):
-    print("cluster num: ", i)
-    kmeans = KMeans(n_clusters=i, init='k-means++', max_iter=300, n_init=10, random_state=0)
-    kmeans.fit(features)
-    wcss.append(kmeans.inertia_)
-plt.plot(range(22, 26), wcss)
-plt.title('Elbow Method')
-plt.xlabel('Number of clusters')
-plt.ylabel('WCSS')
-plt.show()
+# wcss = []
+# for i in range(22, 26):
+#     print("cluster num: ", i)
+#     kmeans = KMeans(n_clusters=i, init='k-means++', max_iter=300, n_init=10, random_state=0)
+#     kmeans.fit(features)
+#     wcss.append(kmeans.inertia_)
+# plt.plot(range(22, 26), wcss)
+# plt.title('Elbow Method')
+# plt.xlabel('Number of clusters')
+# plt.ylabel('WCSS')
+# plt.show()
+
+kmeans_cluster = KmeansCluter()
+clusters = kmeans_cluster.get_clusters(features)
+claims_cluster_df = kmeans_cluster.get_claims_cluster_df(tokenized_sents)
+
+print(claims_cluster_df.head(20))
