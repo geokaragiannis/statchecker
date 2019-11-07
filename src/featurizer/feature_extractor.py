@@ -1,15 +1,20 @@
 import logging
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.pipeline import FeatureUnion
 
+from src.featurizer.sentence_embedding import SentenceEmbedding
 from src import helpers
 
 
 class FeatureExtractor:
-    def __init__(self, max_features=None):
+    def __init__(self, max_features=None, mode="word-embeddings"):
         self.nlp = helpers.get_nlp()
-        self.featurizer = TfidfVectorizer(sublinear_tf=True, min_df=1, smooth_idf=True, norm="l2", encoding="utf-8",
-                                          analyzer="word", ngram_range=(1,2))
+        if mode == "tfidf":
+            self.featurizer = TfidfVectorizer(sublinear_tf=True, min_df=1, smooth_idf=True, norm="l2", encoding="utf-8",
+                                              analyzer="word", ngram_range=(1,2))
+        elif mode == "word-embeddings":
+            self.featurizer = SentenceEmbedding()
+        else:
+            self.featurizer = None
         self.features = None
         self.logger = logging.getLogger(__name__)
 
