@@ -15,7 +15,7 @@ class TokenizerDriver:
         :return: list of lists
         """
         for sent in claim_spans:
-            self.tokenized_claims.append(" ".join([x.lower_ for x in sent if self._pass_filter(x)]))
+            self.tokenized_claims.append(" ".join([x.lower_ for x in self.nlp(sent) if self._pass_filter(x)]))
         return self.tokenized_claims
 
     @staticmethod
