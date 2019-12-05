@@ -10,8 +10,8 @@ class TokenizerDriver:
 
     def tokenize_claims(self, claim_spans):
         """
-        Given a list of Spacy spans representing the sentences of claims, return a list of tokenized claims
-        :param claim_spans: list of Spacy Spans
+        Given a list of sentences, return a list of tokenized sentences
+        :param claim_spans: list of str sentences
         :return: list of lists
         """
         for sent in claim_spans:
