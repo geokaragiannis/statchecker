@@ -14,9 +14,10 @@ class TokenizerDriver:
         :param claim_spans: list of str sentences
         :return: list of lists
         """
+        tokenized_claims = []
         for sent in claim_spans:
-            self.tokenized_claims.append(" ".join([x.lower_ for x in self.nlp(sent) if self._pass_filter(x)]))
-        return self.tokenized_claims
+            tokenized_claims.append(" ".join([x.lower_ for x in self.nlp(sent) if self._pass_filter(x)]))
+        return tokenized_claims
 
     @staticmethod
     def _pass_filter(tok):
