@@ -20,9 +20,16 @@ class FeatureExtractor:
 
     def featurize_claims(self, tokenized_claims):
         """
-        Returns featurized claims
+        Returns anf fits features of sentences
         :param tokenized_claims: List of strings of the tokenized claims
         :return: list of lists
         """
         self.features = self.featurizer.fit_transform(tokenized_claims)
         return self.features
+
+    def featurize_test(self, tokenized_test_list):
+        """
+        Returns the features of a test set (does not fit the featurizer)
+        """
+
+        return self.featurizer.transform(tokenized_test_list)
