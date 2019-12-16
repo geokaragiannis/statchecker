@@ -16,7 +16,7 @@ class TokenizerDriver:
         """
         tokenized_claims = []
         for sent in claim_spans:
-            tokenized_claims.append(" ".join([x.lower_ for x in self.nlp(sent) if self._pass_filter(x)]))
+            tokenized_claims.append(" ".join([x.lower_ for x in self.nlp(str(sent)) if self._pass_filter(x)]))
         return tokenized_claims
 
     @staticmethod
