@@ -14,7 +14,7 @@ from src.tokenizer.tokenizer_driver import TokenizerDriver
 from src.featurizer.feature_extractor import FeatureExtractor
 
 
-DATA_PATH = "data/main_annotated_dataset_12-15-2019.csv"
+DATA_PATH = "data/main_annotated_dataset_12-16-2019.csv"
 
 
 def join_formula_join_df(formula_df, lookup_df):
@@ -25,6 +25,13 @@ def join_formula_join_df(formula_df, lookup_df):
     unique_formula_df = joined_df.drop_duplicates(subset=["sent", "claim", "template_formula"])
     unique_formula_lookup_df = unique_formula_df.drop_duplicates(subset=["sent", "claim", "row_index"])
     return unique_formula_lookup_df
+
+
+def create_cv_dataset(df, label_column, cv=5):
+    """
+    Only keep labels which appear more than cv times in the df
+    """
+    return df.groupby(label_column).filter(lambda x: len(x) > cv)
 
 
 def print_stats(df):
@@ -97,7 +104,7 @@ def get_test_train_split(features, labels, test_size=0.20, random_state=2):
 
 
 def fit_classifier(X_train, y_train):
-    model = LinearSVC(dual=False, max_iter=3000)
+    model = LinearSVC(dual=True, max_iter=3000)
     model.fit(X_train, y_train)
     final_model = CalibratedClassifierCV(base_estimator=model, cv="prefit")
     final_model.fit(X_train, y_train)
@@ -133,6 +140,10 @@ lookup_df = parser.get_lookup_df()
 lookup_df = lookup_df[lookup_df.row_index.notnull()]
 lookup_df = lookup_df.drop_duplicates(subset=["sent", "claim", "row_index"]).reset_index(drop=True)
 main_df = join_formula_join_df(formula_df, lookup_df)
+cv = 3
+main_df = create_cv_dataset(main_df, "template_formula", cv=cv)
+main_df = create_cv_dataset(main_df, "row_index", cv=cv)
+
 
 print_stats(main_df)
 
@@ -152,6 +163,8 @@ print("features extracted")
 print("Sentence features shape: {}".format(features_sents.shape))
 print("Claims features shape: {}".format(features_claims.shape))
 print("Union features shape: {}".format(features_union.shape))
+print("cross validation for sigmoid training is {}".format(cv))
+
 
 k = 3
 # for formula predictions

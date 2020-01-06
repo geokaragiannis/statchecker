@@ -141,7 +141,7 @@ lookup_df = parser.get_lookup_df()
 lookup_df = lookup_df.drop_duplicates(subset=["sent", "claim"]).reset_index(drop=True)
 lookup_df = lookup_df[lookup_df.row_index.notnull()]
 lookup_df = lookup_df.drop_duplicates(subset=["sent", "claim", "row_index"]).reset_index(drop=True)
-cv = 3
+cv = 30
 print("number of samples before prunning: {}".format(len(lookup_df)))
 main_df = create_cv_dataset(lookup_df, "row_index", cv=cv)
 print_stats(main_df)
@@ -168,7 +168,7 @@ k = 3
 print("Running classifier for template formulas")
 print("cross validation for sigmoid training is {}".format(cv))
 l_labels = list(main_df["row_index"])
-l_topn = 5
+l_topn = 1
 l_acc_k_runs = get_accuracy_from_k_runs(features_union, l_labels, cv, topn=l_topn)
 print("accuracy for {} number of runs for row index formulas {} for topn = {}".format(k, l_acc_k_runs, l_topn))
 # fx_train, fx_test, fy_train, fy_test = get_test_train_split(features_union, f_labels)

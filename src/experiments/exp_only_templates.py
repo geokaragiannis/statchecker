@@ -140,7 +140,8 @@ parser = DatasetParser(DATA_PATH)
 formula_df = parser.get_formula_df()
 formula_df = formula_df.drop_duplicates(subset=["sent", "claim"]).reset_index(drop=True)
 main_df = formula_df.drop_duplicates(subset=["sent", "claim"])
-cv = 5
+cv = 40
+print("number of samples before prunning: {}".format(len(main_df)))
 main_df = create_cv_dataset(main_df, "template_formula", cv=cv)
 print_stats(main_df)
 
@@ -166,7 +167,7 @@ k = 3
 print("Running classifier for template formulas")
 print("cross validation for sigmoid training is {}".format(cv))
 f_labels = list(main_df["template_formula"])
-f_topn = 5
+f_topn = 1
 f_acc_k_runs = get_accuracy_from_k_runs(features_union, f_labels, cv, topn=f_topn)
 print("accuracy for {} number of runs for template formulas {} for topn = {}".format(k, f_acc_k_runs, f_topn))
 # fx_train, fx_test, fy_train, fy_test = get_test_train_split(features_union, f_labels)
