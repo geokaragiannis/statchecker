@@ -54,10 +54,17 @@ class TemplateTransformer:
             ret_formula = ret_formula.replace(s, const_str)
         return ret_formula
 
-    def replace_if_formula(self, formula):
+    @staticmethod
+    def replace_if_formula(formula, if_reference):
         """
         replaces the if statements in the formula. E.g the formula "IF(a<b, "OK", "FALSE") will become a<b
         """
+        # if we get one element in if_reference, this means that the extraction is correct. So we return the `body` of
+        # the if statement. Otherwise, the extraction was not correct, and return the original formula
+        if len(if_reference) == 1:
+            return if_reference[0]
+        else:
+            return formula
 
     @staticmethod
     def remove_white_space(s):
@@ -72,8 +79,10 @@ class TemplateTransformer:
         # G12, G1, ... etc.
         cell_references = re.findall(self.regex_obj.formula_regex, formula)
         string_references = re.findall(self.regex_obj.str_const_regex, formula)
+        if_references = re.findall(self.regex_obj.if_regex, formula)
         ref_vars_dict = self.get_variables_for_formula(cell_references, self.variables_list)
-        template_formula = self.replace_variables_in_formula(formula, ref_vars_dict)
+        template_formula = self.replace_if_formula(formula, if_references)
+        template_formula = self.replace_variables_in_formula(template_formula, ref_vars_dict)
         template_formula = self.replace_str_in_formula(template_formula, string_references)
         template_formula = self.remove_white_space(template_formula)
         return template_formula
