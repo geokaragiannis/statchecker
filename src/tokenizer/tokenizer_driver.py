@@ -8,7 +8,7 @@ class TokenizerDriver:
         self.nlp = helpers.get_nlp()
         self.logger = logging.getLogger(__name__)
 
-    def tokenize_claims(self, claim_spans):
+    def tokenize_data(self, claim_spans):
         """
         Given a list of sentences, return a list of tokenized sentences
         :param claim_spans: list of str sentences
