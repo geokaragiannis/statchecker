@@ -63,6 +63,8 @@ for run in range(0, k):
 
     train_df, test_df = parser.get_test_train_cv_split(template_df, "template_formula", min_samples=min_samples_per_label)
     print("number of samples after prunning for run number {}: {}".format(run+1, len(train_df) + len(test_df)))
+    print("number of unique labels for run number {}: {}".format(run+1, len(train_df.drop_duplicates(subset="template_formula"))))
+    print("No intersection of train, test set: {}".format(len(pd.merge(train_df, test_df, how="inner", on=["sent", "claim"])) == 0))
 
     X_train = parser.get_feature_union_train(train_df, tok_driver, featurizer_emb, featurizer_tf)
     X_test = parser.get_feature_union_test(test_df, tok_driver, featurizer_emb, featurizer_tf)
