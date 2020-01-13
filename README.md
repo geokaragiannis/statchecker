@@ -37,7 +37,7 @@ You need to have:
 (2) The `csv` file needs to have the same format as the currect on this repo (`data/main_annotated_dataset_12-16-2019.csv`).
 (3) Need to have all the requirements from `requirements.txt`
 
-Before you can run do:
+**Before** you can run do:
 
 * Create a Virtual Environment with python version `3.5.6` (although probably anything above that will do)
 * `python -m spacy download en_core_web_md`
