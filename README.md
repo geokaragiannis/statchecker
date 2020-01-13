@@ -1,5 +1,7 @@
 # IEA factchecking project
 
+Tested with `Python 3.5.6`
+
 ## Template and row_index predictions
 
 * `src/tokenizer/tokenizer_driver.py`
