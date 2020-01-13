@@ -13,7 +13,6 @@ class ClassifierLinearSVM:
 
     def train(self, X_train, y_train):
         self.model = LinearSVC(dual=True, max_iter=3000)
-        # model.fit(X_train, y_train)
         self.calibrated_model = CalibratedClassifierCV(base_estimator=self.model, cv=self.cv)
         self.calibrated_model.fit(X_train, y_train)
         return self.calibrated_model

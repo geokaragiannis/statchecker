@@ -84,15 +84,6 @@ def get_stats(predictions, y_test, topn):
     print("percentage of times p1>=0.5 and first prediction is correct: {}".format(num_p1_more_0_5_correct/num_p1_more_0_5))
     print("\n")
 
-def join_formula_join_df(formula_df, lookup_df):
-    joined_df = pd.merge(formula_df, lookup_df, on=["sent", "claim"], how="left")
-    joined_df = joined_df[["sent", "claim", "formula_x", "template_formula", "row_index_y", "file_x"]]
-    joined_df = joined_df[joined_df.row_index_y.notnull()]
-    joined_df = joined_df.rename(columns={"formula_x": "formula", "row_index_y": "row_index", "file_x": "file"})
-    unique_formula_df = joined_df.drop_duplicates(subset=["sent", "claim", "template_formula"])
-    unique_formula_lookup_df = unique_formula_df.drop_duplicates(subset=["sent", "claim", "row_index"])
-    return unique_formula_lookup_df
-
 parser = DatasetParser(DATA_PATH)
 lookup_df = parser.get_lookup_df()
 lookup_df = lookup_df.drop_duplicates(subset=["sent", "claim"]).reset_index(drop=True)
