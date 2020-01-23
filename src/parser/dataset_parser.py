@@ -8,17 +8,32 @@ import pandas as pd
 import re
 import numpy as np
 import scipy
+import json
 
 from src.regex.regex import Regex
 from src.templates.template_transformer import TemplateTransformer
+from src import helpers
 
 
 class DatasetParser:
     def __init__(self, data_path):
-        self.main_df = pd.read_csv(data_path)
+        self.main_df = self.create_main_df(data_path)
         self.row_df = None
         self.formula_df = None
         self.regex_obj = Regex()
+
+    def create_main_df(self, data_path):
+        csv_files = helpers.get_files_from_dir(data_path)
+        df = pd.DataFrame()
+        for file in csv_files:
+            chapter_df = pd.read_csv(file)
+            chapter_df["file"] = file
+            df = pd.concat([df, chapter_df])
+        # rename the dataframe
+        df = df.rename(columns={"Text": "sent", "Claim": "claim", "Calculation Equation": "formula",
+                                "LOOKUP and FORMULA Dictionaries": "dicts", "Annotation Tab": "tab", 
+                                "Calculation Value": "calculation_value"})
+        return df
 
     def _cleanup_formula_df(self, row):
         if "LOOKUP" in str(row["claim"]) or "LOOKUP" in str(row["formula"]):
@@ -34,6 +49,28 @@ class DatasetParser:
         else:
             return True
 
+    def expanded_reference_is_valid(self, ref):
+        if "!" in ref:
+            return False
+        return True
+    
+    def extend_formula(self, row):
+        """
+        Go through the cell references in the formula and for each cell, check whether this cell can be replaced by its references
+        Example: formula = G11 + G12 and G11 = G124+G332/2. Then extended_formula = G124+G332/2 + G12 
+        """
+        dicts = json.loads(row["dicts"])
+        formula_dict = dicts["formula_dict"]
+        formula = row["formula"]
+        cell_references = re.findall(self.regex_obj.formula_regex, formula)
+        for ref in cell_references:
+            # the cells that the cells in the fomrula reference
+            expanded_reference_formula_dict = formula_dict.get(ref, dict())
+            expanded_reference = expanded_reference_formula_dict.get("formula", ref)
+            if self.expanded_reference_is_valid(expanded_reference):
+                formula = formula.replace(ref, expanded_reference)
+        return formula
+
     def get_formula_df(self, create_templates=True):
         """
         Returns a dataframe, which only consists of rows that have valid formulas.
@@ -44,6 +81,7 @@ class DatasetParser:
         self.main_df["keep"] = self.main_df.apply(self._cleanup_formula_df, axis=1)
         self.formula_df = self.main_df[self.main_df.keep == True]
         self.formula_df = self.formula_df.drop(columns="keep")
+        self.formula_df["extended_formula"] = self.formula_df.apply(self.extend_formula, axis=1)
         if create_templates:
             template_transformer = TemplateTransformer(self.formula_df)
             self.formula_df = template_transformer.transform_formula_df()

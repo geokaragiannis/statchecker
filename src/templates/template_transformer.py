@@ -11,7 +11,7 @@ class TemplateTransformer:
     def __init__(self, df):
         self.df = df
         self.regex_obj = Regex()
-        variables = "abcdefghijklmnopqrstuvwxyz"
+        variables = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
         self.variables_list = [v for v in variables]
 
     @staticmethod
@@ -29,6 +29,8 @@ class TemplateTransformer:
             if ref not in ret_dict:
                 ret_dict[ref] = variables[var_idx]
                 var_idx += 1
+                if var_idx > 50:
+                    break
         return ret_dict
 
     @staticmethod
@@ -75,7 +77,7 @@ class TemplateTransformer:
         applied to each row, returning the template for each formula, by substituting vars for cell references and
         strings with a string constant
         """
-        formula = row.formula
+        formula = row.extended_formula
         # G12, G1, ... etc.
         cell_references = re.findall(self.regex_obj.formula_regex, formula)
         string_references = re.findall(self.regex_obj.str_const_regex, formula)

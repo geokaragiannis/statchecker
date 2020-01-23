@@ -39,3 +39,15 @@ def get_tables_list(table_dir_path):
             if file_suffix == "csv":
                 tables_list.append(Table(os.path.join(table_dir_path, file), file_prefix))
     return tables_list
+
+
+
+def get_files_from_dir(basepath):
+    """
+    Returns a list of files inside the directory of the specified path
+    """
+    files = []
+    for entry in os.listdir(basepath):
+        if os.path.isfile(os.path.join(basepath, entry)):
+            files.append(os.path.join(basepath, entry))
+    return files

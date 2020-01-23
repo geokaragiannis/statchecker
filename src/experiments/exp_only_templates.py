@@ -17,7 +17,7 @@ from src.classifier.classifier_linear_svm import ClassifierLinearSVM
 from src.simulate_crowdworkers.crowdworker import Crowdworker
 
 
-DATA_PATH = "data/main_annotated_dataset_12-16-2019.csv"
+DATA_PATH = "data/claims_01-23-2020/"
 
 arg_parser = argparse.ArgumentParser(description='Arguments for inference client')
 arg_parser.add_argument('--num_runs', type=int, help='number of times to run the experiment', required=True)
