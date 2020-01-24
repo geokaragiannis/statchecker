@@ -78,8 +78,9 @@ class DatasetParser:
         formula
         """
         # remove unwanted rows
-        self.main_df["keep"] = self.main_df.apply(self._cleanup_formula_df, axis=1)
-        self.formula_df = self.main_df[self.main_df.keep == True]
+        self.formula_df = self.main_df
+        self.formula_df["keep"] = self.formula_df.apply(self._cleanup_formula_df, axis=1)
+        self.formula_df = self.formula_df[self.formula_df.keep == True]
         self.formula_df = self.formula_df.drop(columns="keep")
         self.formula_df["extended_formula"] = self.formula_df.apply(self.extend_formula, axis=1)
         if create_templates:
@@ -87,9 +88,59 @@ class DatasetParser:
             self.formula_df = template_transformer.transform_formula_df()
         return self.formula_df
 
+    def decouple(self, row, item):
+        """
+        For the specified item (i.e row_index, year, tab, ...), return a set of all the mentioned items.
+        Example return set("row_idx1", "row_idx2", "row_idx3") if the lookup_dict contains those 3 row_indexes
+        """
+        ret_set = set()
+        row_dicts = json.loads(row["dicts"])
+        lookup_dict = row_dicts.get("lookup_dict", dict())
+        for _, cell_dict in lookup_dict.items():
+            item_value = cell_dict.get(item)
+            if isinstance(item_value, list):
+                for w in item_value:
+                    ret_set.add(w)
+            elif item_value:
+                ret_set.add(item_value)
+        return ret_set if len(ret_set) > 0 else None
+
+    def add_item_column_to_df(self, df, item, column):
+        """
+        df: dataframe which will be added a new column
+        column: name of the new column to be added
+        item: name of the item in the "dicts" column of the df
+        """
+        df[column] = df.apply(self.decouple, item=item, axis=1)
+        df = df[df[column].notnull()]
+        return df
+
     def get_lookup_df(self):
-        self.row_df = self.main_df[self.main_df["formula"].str.contains("LOOKUP")].reset_index(drop=True)
+        self.row_df = self.main_df
+        self.row_df = self.add_item_column_to_df(self.row_df, "row index", "row_index")
         return self.row_df
+    
+    def get_column_df(self):
+        column_df = self.main_df
+        column_df = self.add_item_column_to_df(column_df, "year", "column")
+        return column_df
+    
+    def get_region_df(self):
+        region_df = self.main_df
+        region_df = self.add_item_column_to_df(region_df, "region", "region")
+        return region_df
+
+    def get_file_df(self):
+        file_df = self.main_df
+        file_df = self.add_item_column_to_df(file_df, "path", "file")
+        return file_df
+
+    def get_complete_df(self):
+        # start with the formula_df and keep adding new items (row_idx, columns, ...)
+        ret_df = self.get_formula_df()
+        for item, col in [("row index", "row_index"), ("year", "column"), ("region", "region"), ("path", "file")]:
+            ret_df = self.add_item_column_to_df(ret_df, item, col)
+        return ret_df
 
     def create_cv_dataset(self, df, label_column, min_samples):
         """
