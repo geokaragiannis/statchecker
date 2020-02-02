@@ -1,6 +1,7 @@
 import numpy as np
 
 from sklearn.svm import LinearSVC
+from sklearn.multiclass import OneVsRestClassifier
 from sklearn.calibration import CalibratedClassifierCV
 
 from src import helpers
@@ -11,8 +12,12 @@ class ClassifierLinearSVM:
         self.model = None
         self.calibrated_model = None
 
-    def train(self, X_train, y_train):
-        self.model = LinearSVC(dual=True, max_iter=3000)
+    def train(self, X_train, y_train, type="single-label"):
+        if type == "single-label":
+            self.model = LinearSVC(dual=True, max_iter=3000)
+        elif type == "multi-label":
+            self.model = OneVsRestClassifier(LinearSVC(dual=True, max_iter=3000))
+
         self.calibrated_model = CalibratedClassifierCV(base_estimator=self.model, cv=self.cv)
         self.calibrated_model.fit(X_train, y_train)
         return self.calibrated_model

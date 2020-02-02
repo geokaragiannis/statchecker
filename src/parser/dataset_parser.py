@@ -103,7 +103,7 @@ class DatasetParser:
                     ret_set.add(w)
             elif item_value:
                 ret_set.add(item_value)
-        return ret_set if len(ret_set) > 0 else None
+        return tuple(ret_set) if len(ret_set) > 0 else None
 
     def add_item_column_to_df(self, df, item, column):
         """
