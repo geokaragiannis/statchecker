@@ -78,6 +78,9 @@ class TemplateTransformer:
         strings with a string constant
         """
         formula = row.extended_formula
+        # if there was a parsing error
+        if not formula:
+            return None
         # G12, G1, ... etc.
         cell_references = re.findall(self.regex_obj.formula_regex, formula)
         string_references = re.findall(self.regex_obj.str_const_regex, formula)

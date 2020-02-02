@@ -28,7 +28,7 @@ class DatasetParser:
         for file in csv_files:
             chapter_df = pd.read_csv(file)
             chapter_df["file"] = file
-            df = pd.concat([df, chapter_df])
+            df = pd.concat([df, chapter_df], sort=False)
         # rename the dataframe
         df = df.rename(columns={"Text": "sent", "Claim": "claim", "Calculation Equation": "formula",
                                 "LOOKUP and FORMULA Dictionaries": "dicts", "Annotation Tab": "tab", 
@@ -59,7 +59,10 @@ class DatasetParser:
         Go through the cell references in the formula and for each cell, check whether this cell can be replaced by its references
         Example: formula = G11 + G12 and G11 = G124+G332/2. Then extended_formula = G124+G332/2 + G12 
         """
-        dicts = json.loads(row["dicts"])
+        try:
+            dicts = json.loads(row["dicts"])
+        except json.decoder.JSONDecodeError:
+            return None
         formula_dict = dicts["formula_dict"]
         formula = row["formula"]
         cell_references = re.findall(self.regex_obj.formula_regex, formula)
