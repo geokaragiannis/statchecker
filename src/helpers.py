@@ -3,11 +3,13 @@ import logging.config
 import os
 import yaml
 import spacy
+import json
 
 from src.table import Table
 
 logger = logging.getLogger(__name__)
 NLP = None
+CONTRAINT_FILE = "data/constraints_dicts"
 
 
 def get_nlp():
@@ -51,3 +53,33 @@ def get_files_from_dir(basepath):
         if os.path.isfile(os.path.join(basepath, entry)):
             files.append(os.path.join(basepath, entry))
     return files
+
+
+def get_possible_values(source_value, target_value):
+    """
+    Returns a list of string values (not value objects), which
+    are possible to be obtained from the source_value.
+    For example if the source_value is of type "tab" with value "tab1" 
+    and the  target_value is of type "row_index" with value "row3", 
+    then we return all the values from the "tab2rowIndex.json" file for 
+    key="tab1". 
+    Arguments:
+        source_value {Value obj} -- [Value used as a key]
+        target_value {Value obj} -- [Value to be obtained]
+    Returns: list of strings or the empty list
+    """
+    constraint_file = None
+    source_property_name = source_value.property.property_name
+    target_property_name = target_value.property.property_name
+    # hacky way to get the filename
+    file_name = "2".join([source_property_name, target_property_name]) + ".json"
+    constraint_file = os.path.join(CONTRAINT_FILE, file_name)
+    try:
+        f = open(constraint_file)
+    except FileNotFoundError:
+        # print("constraint file {} not found".format(constraint_file))
+        return []
+    
+    constraint_dict = json.load(f)
+    # return the list of possible value strings or the empty list, if not found
+    return constraint_dict.get(source_value.value, [])
