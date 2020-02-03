@@ -68,9 +68,35 @@ class TemplateTransformer:
         else:
             return formula
 
+
+
     @staticmethod
     def remove_white_space(s):
         return s.replace(" ", "")
+
+
+
+    def fix_years_cst(self,cell_references,row):
+
+            fixed_cell_dict={}
+
+            year_index=1
+
+            lu_dict=json.loads(row['LOOKUP and FORMULA Dictionaries'])["lookup_dict"]
+            template_formula=row["Calculation Equation"]
+
+            for cell in cell_references:
+                if(cell in lu_dict):
+                    cell_dict=lu_dict[cell]
+                    if('row index' not in cell_dict):
+                        val=cell_dict['value']
+                        if(val):
+                            if(re.match(self.regex_obj.year_regex,val)):
+                                template_formula=template_formula.replace(cell,'y'+str(year_index))
+                                year_index+=1
+            return template_formula
+
+
 
     def create_template_formulas(self, row):
         """
@@ -89,6 +115,7 @@ class TemplateTransformer:
         template_formula = self.replace_if_formula(formula, if_references)
         template_formula = self.replace_variables_in_formula(template_formula, ref_vars_dict)
         template_formula = self.replace_str_in_formula(template_formula, string_references)
+        template_formula = self.fix_years_cst(cell_references, row)
         template_formula = self.remove_white_space(template_formula)
         return template_formula
 
