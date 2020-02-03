@@ -1,0 +1,1 @@
+{"a": "(a)", "a+b": "SELECT (a) + (b) ;", "POWER(a/b,1/(y1-y2))-1": "SELECT(SELECT POWER((SELECT ((a)*1.0/(b))) ,(SELECT 1/(SELECT (y1-y2)))))-1;"}
