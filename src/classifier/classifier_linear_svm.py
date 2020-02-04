@@ -7,15 +7,16 @@ from sklearn.calibration import CalibratedClassifierCV
 from src import helpers
 
 class ClassifierLinearSVM:
-    def __init__(self, cv=3):
+    def __init__(self, cv=3, task="single_label"):
         self.cv = cv
         self.model = None
         self.calibrated_model = None
+        self.task = task
 
-    def train(self, X_train, y_train, type="single-label"):
-        if type == "single-label":
+    def train(self, X_train, y_train):
+        if self.task == "single-label":
             self.model = LinearSVC(dual=True, max_iter=3000)
-        elif type == "multi-label":
+        elif self.task == "multi-label":
             self.model = OneVsRestClassifier(LinearSVC(dual=True, max_iter=3000))
 
         self.calibrated_model = CalibratedClassifierCV(base_estimator=self.model, cv=self.cv)
