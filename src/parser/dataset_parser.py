@@ -21,6 +21,8 @@ class DatasetParser:
         self.row_df = None
         self.formula_df = None
         self.regex_obj = Regex()
+        # contains dicts for row_index, column, ... which maps the hash value to the actual label
+        self.hash_dict = dict()
 
     def create_main_df(self, data_path):
         csv_files = helpers.get_files_from_dir(data_path)
@@ -100,10 +102,22 @@ class DatasetParser:
             item_value = cell_dict.get(item)
             if isinstance(item_value, list):
                 for w in item_value:
-                    ret_set.add(w)
+                    ret_set.add(str(w))
             elif item_value:
-                ret_set.add(item_value)
+                ret_set.add(str(item_value))
         return tuple(ret_set) if len(ret_set) > 0 else None
+    
+    def apply_hash(self, row, column):
+        """
+        Apply a hash function to the item (row_index, column, tab,...) of the row and store
+        the mapping in a dict
+        Arguments:
+            row {Pandas series}
+            column {string} -- the column to hash
+        """
+        hash_value = hash(row[column])
+        self.hash_dict[column][hash_value] = row[column]
+        return hash_value
 
     def add_item_column_to_df(self, df, item, column):
         """
@@ -112,6 +126,10 @@ class DatasetParser:
         item: name of the item in the "dicts" column of the df
         """
         df[column] = df.apply(self.decouple, item=item, axis=1)
+        # add a new column which has the hash value of df[column]
+        # if column is "row_index", then create "row_index_hash" as the new hash column
+        self.hash_dict[column] = dict()
+        df[column+"_hash"] = df.apply(self.apply_hash, column=column, axis=1)
         df = df[df[column].notnull()]
         return df
 
