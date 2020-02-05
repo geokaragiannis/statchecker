@@ -13,6 +13,7 @@ import json
 from src.regex.regex import Regex
 from src.templates.template_transformer import TemplateTransformer
 from src import helpers
+from src.parser.classification_task import ClassificationTask
 
 
 class DatasetParser:
@@ -21,8 +22,23 @@ class DatasetParser:
         self.row_df = None
         self.formula_df = None
         self.regex_obj = Regex()
+        self.config = helpers.load_yaml("src/config.yml")
+        self.classification_tasks_dict = self.get_classification_tasks()
         # contains dicts for row_index, column, ... which maps the hash value to the actual label
         self.hash_dict = dict()
+
+
+    def get_classification_tasks(self):
+        """
+        Return a list of ClassificationTask objects, which are all the possible
+        classifications that we can parse/do.
+        """
+        task_dict = dict()
+        for task_name, task_value in self.config["classification_tasks"].items():
+            task_obj = ClassificationTask(task_value["init_name"], task_value["name"], 
+                                          task_value["hash_name"], task_value["label_task"])
+            task_dict[task_name] = task_obj
+        return task_dict
 
     def create_main_df(self, data_path):
         csv_files = helpers.get_files_from_dir(data_path)
@@ -91,6 +107,7 @@ class DatasetParser:
         if create_templates:
             template_transformer = TemplateTransformer(self.formula_df)
             self.formula_df = template_transformer.transform_formula_df()
+        self.formula_df = self.formula_df.drop_duplicates(subset=["sent", "claim"]).reset_index(drop=True)
         return self.formula_df
 
     def decouple(self, row, item):
@@ -99,8 +116,11 @@ class DatasetParser:
         Example return set("row_idx1", "row_idx2", "row_idx3") if the lookup_dict contains those 3 row_indexes
         """
         ret_set = set()
-        row_dicts = json.loads(row["dicts"])
-        lookup_dict = row_dicts.get("lookup_dict", dict())
+        try:
+            row_dicts = json.loads(row["dicts"])
+            lookup_dict = row_dicts.get("lookup_dict", dict())
+        except json.decoder.JSONDecodeError:
+            return None
         for _, cell_dict in lookup_dict.items():
             item_value = cell_dict.get(item)
             if isinstance(item_value, list):
@@ -134,34 +154,47 @@ class DatasetParser:
         self.hash_dict[column] = dict()
         df[column+"_hash"] = df.apply(self.apply_hash, column=column, axis=1)
         df = df[df[column].notnull()]
+        df = df.drop_duplicates(subset=["sent", "claim"]).reset_index(drop=True)
         return df
 
     def get_lookup_df(self):
         self.row_df = self.main_df
-        self.row_df = self.add_item_column_to_df(self.row_df, "row index", "row_index")
+        task = self.classification_tasks_dict["row_index"]
+        self.row_df = self.add_item_column_to_df(self.row_df, task.init_name, task.name)
         return self.row_df
     
     def get_column_df(self):
         column_df = self.main_df
-        column_df = self.add_item_column_to_df(column_df, "year", "column")
+        task = self.classification_tasks_dict["column"]
+        column_df = self.add_item_column_to_df(column_df, task.init_name, task.name)
         return column_df
     
     def get_region_df(self):
         region_df = self.main_df
-        region_df = self.add_item_column_to_df(region_df, "region", "region")
+        task = self.classification_tasks_dict["region"]
+        region_df = self.add_item_column_to_df(region_df, task.init_name, task.name)
         return region_df
 
     def get_file_df(self):
         file_df = self.main_df
-        file_df = self.add_item_column_to_df(file_df, "path", "file")
+        task = self.classification_tasks_dict["file"]
+        file_df = self.add_item_column_to_df(file_df, task.init_name, task.name)
         return file_df
+
+    def get_tab_df(self):
+        tab_df = self.main_df
+        task = self.classification_tasks_dict["tab"]
+        tab_df = self.add_item_column_to_df(tab_df, task.init_name, task.name)
+        return tab_df
 
     def get_complete_df(self):
         # start with the formula_df and keep adding new items (row_idx, columns, ...)
         ret_df = self.get_formula_df()
-        for item, col in [("row index", "row_index"), ("year", "column"), ("region", "region"), ("path", "file")]:
-            ret_df = self.add_item_column_to_df(ret_df, item, col)
-        return ret_df
+        for task, task_obj in self.classification_tasks_dict.items():
+            if task == "template_formula":
+                continue
+            ret_df = self.add_item_column_to_df(ret_df, task_obj.init_name, task_obj.name)
+        return ret_df 
 
     def create_cv_dataset(self, df, label_column, min_samples):
         """
