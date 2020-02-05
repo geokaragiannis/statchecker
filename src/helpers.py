@@ -30,6 +30,11 @@ def set_up_logging():
     else:
         logging.basicConfig(level=default_level)
 
+def load_yaml(filename):
+    with open(filename, "r") as ymlfile:
+        config_file = yaml.safe_load(ymlfile)
+    return config_file
+
 
 def get_tables_list(table_dir_path):
     tables_list = []
