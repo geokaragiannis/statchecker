@@ -215,39 +215,3 @@ class DatasetParser:
         test_df = test_df[test_df[label_column].isin(train_labels)]
 
         return train_df, test_df
-
-    @staticmethod
-    def get_features_union(features_s, features_c):
-        if isinstance(features_c, scipy.sparse.csr.csr_matrix):
-            features_c = features_c.toarray()
-        if isinstance(features_s, scipy.sparse.csr.csr_matrix):
-            features_s = features_s.toarray()
-        return np.concatenate((features_s, features_c), axis=1)
-
-    def get_feature_union_train(self, df, tokenizer, featurizer_emb, featurizer_tf):
-        sents = list(df["sent"])
-        claims = list(df["claim"])
-        tokenized_sents = tokenizer.tokenize_data(sents)
-        tokenized_claims = tokenizer.tokenize_data(claims)
-        features_sents = featurizer_emb.featurize_train(tokenized_sents)
-        features_claims = featurizer_tf.featurize_train(tokenized_claims)
-        features_union = self.get_features_union(features_sents, features_claims)
-        print("training features extracted")
-        print("Sentence features shape: {}".format(features_sents.shape))
-        print("Claims features shape: {}".format(features_claims.shape))
-        print("Union features shape: {}".format(features_union.shape))
-        return features_union
-
-    def get_feature_union_test(self, df, tokenizer, featurizer_emb, featurizer_tf):
-        sents = list(df["sent"])
-        claims = list(df["claim"])
-        tokenized_sents = tokenizer.tokenize_data(sents)
-        tokenized_claims = tokenizer.tokenize_data(claims)
-        features_sents = featurizer_emb.featurize_test(tokenized_sents)
-        features_claims = featurizer_tf.featurize_test(tokenized_claims)
-        features_union = self.get_features_union(features_sents, features_claims)
-        print("test features extracted")
-        print("Sentence features shape: {}".format(features_sents.shape))
-        print("Claims features shape: {}".format(features_claims.shape))
-        print("Union features shape: {}".format(features_union.shape))
-        return features_union
