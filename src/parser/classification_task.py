@@ -25,6 +25,9 @@ class ClassificationTask:
         if name == hash_name:
             self.has_hash = False
         
+        self.classifier_name = self.name + "_classifier"
+        self.featurizer_tf_name = self.name + "_featurizer_tf"
+        self.featurizer_emb_name = self.name + "_featurizer_emb" 
         # store components needed for classification
         self.is_trained = False
         self.featurizer_tf = None

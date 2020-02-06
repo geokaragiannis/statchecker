@@ -29,3 +29,7 @@ classification_tasks:
         name: "template_formula"
         hash_name: "template_formula"
         label_task: "single-label"
+
+models_dir: "data/exported_models/"
+data_dir: "data/exported_data/"
+test_df_name: "test_df_simulation.csv"
