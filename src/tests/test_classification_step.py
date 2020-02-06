@@ -1,4 +1,4 @@
-from src.pipeline.classification import ClassificationStep
+from src.pipeline.classification_step import ClassificationStep
 
 DATA_PATH = "data/claims_01-23-2020/"
 
@@ -22,5 +22,15 @@ print("len complete df: ", len(classification_pipeline.complete_df))
     
 # min_df.to_csv("data/min_df.csv", index=False)
 
-classification_pipeline.train()
-# print(q)
+# classification_pipeline.train()
+
+classification_pipeline.load_models()
+test_df = classification_pipeline.load_test_df()
+print(len(test_df))
+
+for task_name, task in classification_pipeline.classification_tasks_dict.items():
+    print("task name: ", task_name)
+    print("feat_tf trained: {}, feat_emb trained: {}, classifier trained: {}".format(
+        task.featurizer_tf is not None, task.featurizer_emb is not None, 
+        task.classifier is not None
+    ))

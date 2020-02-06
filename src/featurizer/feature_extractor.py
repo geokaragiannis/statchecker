@@ -7,18 +7,21 @@ from src import helpers
 
 
 class FeatureExtractor:
-    def __init__(self, max_features=None, mode="word-embeddings"):
+    def __init__(self, task, max_features=None, mode="word-embeddings"):
         self.nlp = helpers.get_nlp()
-        if mode == "tfidf":
+        self.mode = mode
+        self.task = task
+        if self.mode == "tfidf":
             self.tfidf_words = TfidfVectorizer(sublinear_tf=True, min_df=1, smooth_idf=True, norm="l2", encoding="utf-8", analyzer="word", ngram_range=(1, 2))
             self.tfidf_chars = TfidfVectorizer(sublinear_tf=True, min_df=1, smooth_idf=True, norm="l2", encoding="utf-8", analyzer="char", ngram_range=(3, 3))
             self.featurizer = FeatureUnion([("words", self.tfidf_words), ("chars", self.tfidf_chars)])
-        elif mode == "word-embeddings":
+        elif self.mode == "word-embeddings":
             self.featurizer = SentenceEmbedding()
         else:
             self.featurizer = None
         self.features = None
         self.logger = logging.getLogger(__name__)
+        self.config = helpers.load_yaml("src/config.yml")
 
     def featurize_train(self, tokenized_utt):
         """
@@ -35,3 +38,15 @@ class FeatureExtractor:
         """
 
         return self.featurizer.transform(tokenized_test_list)
+
+    def load(self):
+        if self.mode == "tfidf":
+            self.featurizer = helpers.load_model_from_dir(self.config["models_dir"], self.task.featurizer_tf_name)
+        elif self.mode == "word-embeddings":
+            self.featurizer = helpers.load_model_from_dir(self.config["models_dir"], self.task.featurizer_emb_name)
+
+    def export(self):
+        if self.mode == "tfidf":
+            helpers.save_model_to_dir(self.config["models_dir"], self.task.featurizer_tf_name, self.featurizer)
+        elif self.mode == "word-embeddings":
+             helpers.save_model_to_dir(self.config["models_dir"], self.task.featurizer_emb_name, self.featurizer)

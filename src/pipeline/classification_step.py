@@ -2,6 +2,7 @@ from src.parser.dataset_parser import DatasetParser
 from src.tokenizer.tokenizer_driver import TokenizerDriver
 from src.featurizer.feature_extractor import FeatureExtractor
 from src.classifier.classifier_linear_svm import ClassifierLinearSVM
+from src import helpers
 
 import pandas as pd
 import numpy as np
@@ -15,6 +16,7 @@ class ClassificationStep:
         self.topn = topn
         self.data_path = data_path
         self.simulation = simulation
+        self.config = helpers.load_yaml("src/config.yml")
 
         self.parser = DatasetParser(self.data_path)
         # dict of classification_tasks to be included in the classification.
@@ -33,10 +35,13 @@ class ClassificationStep:
         """
         Returns a dataframe which will be used for simulation and will not be 
         part of training. Remove this test_df from the original complete dataset.
+        Saves dataframe to directory specified by config.
         Keyword Arguments:
             test_frac {float} -- [Fraction of the whole data for test_df] (default: {0.05})
         """
         test_df = self.complete_df.sample(frac=test_frac)
+        helpers.save_df_to_dir(self.config["data_dir"], self.config["test_df_name"], test_df)
+        print("saved test_df successfully")
         return test_df
 
     def get_train_val_test_splits(self, df, task, train_frac=0.9, val_frac=0.5):
@@ -51,8 +56,8 @@ class ClassificationStep:
         print("No intersection of train, test set: {}".format(len(pd.merge(train_df, val_df, how="inner", on=["sent", "claim"])) == 0))
         return train_df, val_df, test_df
 
-    def train_single_task(self, X_train, y_train, task, label_task):
-        classifier = ClassifierLinearSVM(label_task=label_task, task=task)
+    def train_single_task(self, X_train, y_train, task):
+        classifier = ClassifierLinearSVM(task)
         model = classifier.train(X_train, y_train)
         return classifier
     
@@ -67,8 +72,8 @@ class ClassificationStep:
 
         for _, task in self.classification_tasks_dict.items():
             print("Training classifier for task: {}".format(task.name))
-            featurizer_tf = FeatureExtractor(mode="tfidf")
-            featurizer_emb = FeatureExtractor(mode="word-embeddings")
+            featurizer_tf = FeatureExtractor(task, mode="tfidf")
+            featurizer_emb = FeatureExtractor(task, mode="word-embeddings")
             min_samples_df = self.create_min_samples_dataset(self.complete_df, task)
             train_df, val_df, _ = self.get_train_val_test_splits(min_samples_df, task, 
                                                                            val_frac=val_frac)
@@ -82,14 +87,35 @@ class ClassificationStep:
                                            featurizer_tf, mode="test")
             y_train = list(train_df[task.hash_name])
             y_val = list(val_df[task.hash_name])
-            task_classifier = self.train_single_task(X_train, y_train, task.name, task.label_task)
+            task_classifier = self.train_single_task(X_train, y_train, task)
             val_preds, val_acc = task_classifier.get_pred_and_accuracy(X_val, y_val, topn=self.topn)
             task.featurizer_tf = featurizer_tf
             task.featurizer_emb = featurizer_emb
             task.classifier = task_classifier
             task.val_acc = val_acc
             task.is_trained = True
+            task_classifier.export()
+            featurizer_tf.export()
+            featurizer_emb.export()
             print("val acc for task {} is {}".format(task.name, val_acc))
+
+    def load_models(self):
+        for _, task in self.classification_tasks_dict.items():
+            task_classifier = ClassifierLinearSVM(task)
+            task_classifier.load()
+            task_featurizer_tf = FeatureExtractor(task, mode="tfidf")
+            task_featurizer_tf.load()
+            task_featurizer_emb = FeatureExtractor(task, mode="word-embeddings")
+            task_featurizer_tf.load()
+            task.classifier = task_classifier
+            task.featurizer_tf = task_featurizer_tf
+            task.featurizer_emb = task_featurizer_emb
+            task.is_trained = True
+            print("loaded models for {} task successfuly".format(task.name))
+
+    def load_test_df(self):
+        self.test_df = helpers.load_df_from_dir(self.config["data_dir"], self.config["test_df_name"])
+        return self.test_df
 
     @staticmethod
     def concat_features(features_s, features_c):

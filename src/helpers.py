@@ -4,6 +4,9 @@ import os
 import yaml
 import spacy
 import json
+import pickle
+import pathlib
+import pandas as pd
 
 from src.table import Table
 
@@ -17,6 +20,33 @@ def get_nlp():
     NLP = NLP if NLP else spacy.load("en_core_web_md")
     return NLP
 
+
+
+def safe_mkdir(path):
+    try:
+        pathlib.Path(path).mkdir(parents=True, exist_ok=True)
+    except FileExistsError:
+        pass
+
+def save_model_to_dir(dir, fname, obj):
+    safe_mkdir(dir)
+    fpath = os.path.join(dir, fname)
+    f = open(fpath, "wb")
+    pickle.dump(obj, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+def load_model_from_dir(dir, fname):
+    fpath = os.path.join(dir, fname)
+    f = open(fpath, "rb")
+    return pickle.load(f)
+
+def save_df_to_dir(dir, fname, df):
+    safe_mkdir(dir)
+    fpath = os.path.join(dir, fname)
+    df.to_csv(fpath, index=False)
+
+def load_df_from_dir(dir, fname):
+    fpath = os.path.join(dir, fname)
+    return pd.read_csv(fpath)
 
 def set_up_logging():
     default_config = "logging.yml"
