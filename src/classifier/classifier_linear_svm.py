@@ -3,22 +3,23 @@ import numpy as np
 from sklearn.svm import LinearSVC
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.calibration import CalibratedClassifierCV
+import pickle
 
 from src import helpers
 
 class ClassifierLinearSVM:
-    def __init__(self, cv=3, label_task="single_label", task=None):
+    def __init__(self, task, cv=3):
         self.cv = cv
         self.model = None
         self.calibrated_model = None
-        self.label_task = label_task
         # name of the property
         self.task = task
+        self.config = helpers.load_yaml("src/config.yml")
 
     def train(self, X_train, y_train):
-        if self.label_task == "single-label":
+        if self.task.label_task == "single-label":
             self.model = LinearSVC(dual=True, max_iter=3000)
-        elif self.label_task == "multi-label":
+        elif self.task.label_task == "multi-label":
             self.model = OneVsRestClassifier(LinearSVC(dual=True, max_iter=3000))
 
         self.calibrated_model = CalibratedClassifierCV(base_estimator=self.model, cv=self.cv)
@@ -69,3 +70,9 @@ class ClassifierLinearSVM:
             if test in topn_list:
                 num_correct += 1
         return predictions, num_correct/len(y_test)
+
+    def load(self):
+        self.calibrated_model = helpers.load_model_from_dir(self.config["models_dir"], self.task.classifier_name)
+
+    def export(self):
+        helpers.save_model_to_dir(self.config["models_dir"], self.task.classifier_name, self.calibrated_model)
