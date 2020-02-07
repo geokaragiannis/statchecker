@@ -24,9 +24,6 @@ class DatasetParser:
         self.regex_obj = Regex()
         self.config = helpers.load_yaml("src/config.yml")
         self.classification_tasks_dict = self.get_classification_tasks()
-        # contains dicts for row_index, column, ... which maps the hash value to the actual label
-        self.hash_dict = dict()
-
 
     def get_classification_tasks(self):
         """
@@ -130,61 +127,58 @@ class DatasetParser:
                 ret_set.add(str(item_value))
         return tuple(ret_set) if len(ret_set) > 0 else None
     
-    def apply_hash(self, row, column):
+    def apply_hash(self, row, task):
         """
         Apply a hash function to the item (row_index, column, tab,...) of the row and store
         the mapping in a dict
         Arguments:
             row {Pandas series}
-            column {string} -- the column to hash
+            task {ClassificationTask object} -- the task to apply a hash
         """
-        hash_value = hash(row[column])
-        self.hash_dict[column][hash_value] = row[column]
+        hash_value = task.hash_(row[task.name])
         return hash_value
 
-    def add_item_column_to_df(self, df, item, column):
+    def add_item_column_to_df(self, df, task):
         """
         df: dataframe which will be added a new column
-        column: name of the new column to be added
-        item: name of the item in the "dicts" column of the df
+        task: ClassificationTask obj 
         """
-        df[column] = df.apply(self.decouple, item=item, axis=1)
+        df[task.name] = df.apply(self.decouple, item=task.init_name, axis=1)
         # add a new column which has the hash value of df[column]
         # if column is "row_index", then create "row_index_hash" as the new hash column
-        self.hash_dict[column] = dict()
-        df[column+"_hash"] = df.apply(self.apply_hash, column=column, axis=1)
-        df = df[df[column].notnull()]
+        df[task.hash_name] = df.apply(self.apply_hash, task=task, axis=1)
+        df = df[df[task.name].notnull()]
         df = df.drop_duplicates(subset=["sent", "claim"]).reset_index(drop=True)
         return df
 
     def get_lookup_df(self):
         self.row_df = self.main_df
         task = self.classification_tasks_dict["row_index"]
-        self.row_df = self.add_item_column_to_df(self.row_df, task.init_name, task.name)
+        self.row_df = self.add_item_column_to_df(self.row_df, task)
         return self.row_df
     
     def get_column_df(self):
         column_df = self.main_df
         task = self.classification_tasks_dict["column"]
-        column_df = self.add_item_column_to_df(column_df, task.init_name, task.name)
+        column_df = self.add_item_column_to_df(column_df, task)
         return column_df
     
     def get_region_df(self):
         region_df = self.main_df
         task = self.classification_tasks_dict["region"]
-        region_df = self.add_item_column_to_df(region_df, task.init_name, task.name)
+        region_df = self.add_item_column_to_df(region_df, task)
         return region_df
 
     def get_file_df(self):
         file_df = self.main_df
         task = self.classification_tasks_dict["file"]
-        file_df = self.add_item_column_to_df(file_df, task.init_name, task.name)
+        file_df = self.add_item_column_to_df(file_df, task)
         return file_df
 
     def get_tab_df(self):
         tab_df = self.main_df
         task = self.classification_tasks_dict["tab"]
-        tab_df = self.add_item_column_to_df(tab_df, task.init_name, task.name)
+        tab_df = self.add_item_column_to_df(tab_df, task)
         return tab_df
 
     def get_complete_df(self):
@@ -193,7 +187,7 @@ class DatasetParser:
         for task, task_obj in self.classification_tasks_dict.items():
             if task == "template_formula":
                 continue
-            ret_df = self.add_item_column_to_df(ret_df, task_obj.init_name, task_obj.name)
+            ret_df = self.add_item_column_to_df(ret_df, task_obj)
         return ret_df 
 
     def create_cv_dataset(self, df, label_column, min_samples):
