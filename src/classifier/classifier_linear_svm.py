@@ -42,7 +42,7 @@ class ClassifierLinearSVM:
 
     def predict_utt_top_n(self, featurized_utt, n=3):
         """
-        predict the topn intents along with the confidence probability for each one.
+        predict the topn predictions along with the confidence probability for each one.
         Note that model.classes_ contains the trained labels in alphabetical order. Here, we sort the
         confidences together with the labels, and return the top3 from this sorted order
         Args:
@@ -58,6 +58,13 @@ class ClassifierLinearSVM:
         scaled_confidences = self._linear_scale_confidence(confidences)
 
         return labels, scaled_confidences
+
+    def predict_batch_top_n(self, X_test, topn=5):
+        """
+        predict the topn predictions for the whole batch.
+        Returns a list of tuples, where each tuple is a list
+        """
+        return [self.predict_utt_top_n(test.reshape(1, -1), n=topn) for test in X_test]
 
     def get_pred_and_accuracy(self, X_test, y_test, topn=5):
         """
