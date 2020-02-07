@@ -33,3 +33,26 @@ class ClassificationTask:
         self.featurizer_tf = None
         self.featurizer_emb = None
         self.classifier = None
+
+        # dict to translate a label to a unique value
+        self.label_to_hash_dict = dict()
+        self.hash_to_label_dict = dict()
+        # hash_counter will always be incremented when we add a new label to a task's hash_dict
+        self.hash_counter = 0
+
+    
+    def hash_(self, label):
+        """
+        For a given label for this task create 2 maps
+        1. get a unique integer from a label
+        2. get a label from a unique integer
+        return the unique value for this label
+        """
+        if label in self.label_to_hash_dict:
+            return self.label_to_hash_dict[label]
+        else:
+            self.hash_counter += 1
+            self.label_to_hash_dict[label] = self.hash_counter
+            self.hash_to_label_dict[self.hash_counter] = label
+
+        return self.label_to_hash_dict[label]
