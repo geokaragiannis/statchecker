@@ -9,7 +9,7 @@ class Claim:
         self.expected_cost = 0.0
         self.real_cost = 0.0
         # list of Property objects, which are relevant for this claim
-        self.availabe_properties = available_properties
+        self.available_properties = available_properties
         self.verification_cost = ver_cost
         self.derivation_cost = der_cost
     
@@ -25,7 +25,7 @@ class Claim:
         """
         best_property_order = None
         min_expected_verification_cost = np.inf
-        for candidate_property in self.availabe_properties:
+        for candidate_property in self.available_properties:
             candidate_order, candidate_cost = self.get_property_order(candidate_property)
             if candidate_cost < min_expected_verification_cost:
                 best_property_order = candidate_order
@@ -44,13 +44,13 @@ class Claim:
                                           expected verification cost for that order]
         """
         existing_ordered_properties = [candidate_property]
-        remaining_candidates = list(set(self.availabe_properties) - set(existing_ordered_properties))
+        remaining_candidates = list(set(self.available_properties) - set(existing_ordered_properties))
         property_order_cost = 0.0
         while len(remaining_candidates) > 0:
             next_best_property, next_best_cost = self.find_next_best_property(existing_ordered_properties, remaining_candidates)
             existing_ordered_properties.append(next_best_property)
             property_order_cost += next_best_cost
-            remaining_candidates =  list(set(self.availabe_properties) - set(existing_ordered_properties))
+            remaining_candidates =  list(set(self.available_properties) - set(existing_ordered_properties))
 
         return (existing_ordered_properties, property_order_cost)
 
@@ -68,7 +68,7 @@ class Claim:
         best_property = None
         min_expected_verification_cost = np.inf
         # list of properties that we can choose from
-        # remaining_candidates = list(set(self.availabe_properties) - set(existing_ordered_properties))
+        # remaining_candidates = list(set(self.available_properties) - set(existing_ordered_properties))
         for candidate_property in remaining_property_candidates:
             for candidate_value in candidate_property.candidate_values:
                 expected_verification_cost = self.get_expected_verification_cost(existing_ordered_properties, candidate_value)
