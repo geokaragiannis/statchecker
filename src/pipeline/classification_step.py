@@ -63,7 +63,6 @@ class ClassificationStep:
     
     def train(self, val_frac=1.0):
         
-        # TODO: check if the classifiers are saved in a pickle before training
         if self.simulation:
             self.test_df = self.get_test_df_simulation(test_frac=0.05)
             # only keep data not picked for testing
@@ -115,6 +114,7 @@ class ClassificationStep:
 
     def load_test_df(self):
         self.test_df = helpers.load_df_from_dir(self.config["data_dir"], self.config["test_df_name"])
+        print("loaded test_df successfuly")
         return self.test_df
 
     @staticmethod
@@ -135,8 +135,8 @@ class ClassificationStep:
             features_sents = featurizer_emb.featurize_test(tokenized_sents)
             features_claims = featurizer_tf.featurize_test(tokenized_claims)
         features_union = self.concat_features(features_sents, features_claims)
-        print("training features extracted")
-        print("Sentence features shape: {}".format(features_sents.shape))
-        print("Claims features shape: {}".format(features_claims.shape))
-        print("Union features shape: {}".format(features_union.shape))
+        # print("training features extracted")
+        # print("Sentence features shape: {}".format(features_sents.shape))
+        # print("Claims features shape: {}".format(features_claims.shape))
+        # print("Union features shape: {}".format(features_union.shape))
         return features_union
