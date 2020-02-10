@@ -10,7 +10,7 @@ import scipy
 
 
 class ClassificationStep:
-    def __init__(self, data_path, cv=3, min_samples=5, topn=5, simulation=True):
+    def __init__(self, data_path, cv=3, min_samples=1, topn=5, simulation=True):
         self.cv = cv
         self.min_samples = min_samples
         self.topn = topn
