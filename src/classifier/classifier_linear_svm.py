@@ -22,7 +22,8 @@ class ClassifierLinearSVM:
         elif self.task.label_task == "multi-label":
             self.model = OneVsRestClassifier(LinearSVC(dual=True, max_iter=3000))
 
-        self.calibrated_model = CalibratedClassifierCV(base_estimator=self.model, cv=self.cv)
+        self.model.fit(X_train, y_train)
+        self.calibrated_model = CalibratedClassifierCV(base_estimator=self.model, cv="prefit")
         self.calibrated_model.fit(X_train, y_train)
         return self.calibrated_model
     
