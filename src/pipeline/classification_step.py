@@ -110,11 +110,11 @@ class ClassificationStep:
             task.featurizer_tf = task_featurizer_tf
             task.featurizer_emb = task_featurizer_emb
             task.is_trained = True
-            print("loaded models for {} task successfuly".format(task.name))
+            print("loaded models for {} task successfully".format(task.name))
 
     def load_test_df(self):
         self.test_df = helpers.load_df_from_dir(self.config["data_dir"], self.config["test_df_name"])
-        print("loaded test_df successfuly")
+        print("loaded test_df successfully")
         return self.test_df
 
     @staticmethod
