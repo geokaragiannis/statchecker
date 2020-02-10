@@ -2,6 +2,9 @@
 This class holds information about different classification tasks like 
 row_index, tab, file prediction.
 """
+import json
+import os
+from src import helpers
 
 
 class ClassificationTask:
@@ -27,6 +30,8 @@ class ClassificationTask:
         if name == hash_name:
             self.has_hash = False
         
+        self.config = helpers.load_yaml("src/config.yml")
+
         self.classifier_name = self.name + "_classifier"
         self.featurizer_tf_name = self.name + "_featurizer_tf"
         self.featurizer_emb_name = self.name + "_featurizer_emb" 
@@ -39,6 +44,7 @@ class ClassificationTask:
         # dict to translate a label to a unique value
         self.label_to_hash_dict = dict()
         self.hash_to_label_dict = dict()
+        self.hash_to_label_dict_name = self.name + "_hash_to_label_dict.json"
         # hash_counter will always be incremented when we add a new label to a task's hash_dict
         self.hash_counter = 0
 
@@ -54,7 +60,17 @@ class ClassificationTask:
             return self.label_to_hash_dict[label]
         else:
             self.hash_counter += 1
-            self.label_to_hash_dict[label] = self.hash_counter
+            self.label_to_hash_dict[label] = str(self.hash_counter)
             self.hash_to_label_dict[self.hash_counter] = label
 
         return self.label_to_hash_dict[label]
+
+    def export_hash_to_label_dict(self):
+        fname = os.path.join(self.config["models_dir"], self.hash_to_label_dict_name)
+        with open(fname, "w") as fp:
+            json.dump(self.hash_to_label_dict, fp)
+
+    def load_hash_to_label_dict(self):
+        fname = os.path.join(self.config["models_dir"], self.hash_to_label_dict_name)
+        with open(fname, "r") as fp:
+            self.hash_to_label_dict = json.load(fp)

@@ -42,11 +42,10 @@ class Simulation:
             if prop.property_name == "template_formula":
                 values_list = [Value(label, prob, prop) for label, prob in zip(pred_labels, pred_probs)]
             else:
-                # print("prop: ", prop.property_name)
                 hash_to_label_dict = prop.task.hash_to_label_dict
-                # print(hash_to_label_dict)
+                # print(len(hash_to_label_dict))
                 try:
-                    values_list = [Value(hash_to_label_dict[label], prob, prop) for label, prob in zip(pred_labels, pred_probs)]
+                    values_list = [Value(hash_to_label_dict[str(label)], prob, prop) for label, prob in zip(pred_labels, pred_probs)]
                 except: 
                     not_found_hash += 1
                     values_list = [Value(label, prob, prop) for label, prob in zip(pred_labels, pred_probs)]
