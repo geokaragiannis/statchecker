@@ -22,8 +22,7 @@ class ClassificationStep:
         # dict of classification_tasks to be included in the classification.
         self.classification_tasks_dict = self.parser.classification_tasks_dict
         self.tok_driver = TokenizerDriver()
-
-        self.complete_df = self.parser.get_complete_df()
+        self.complete_df = None
         self.train_df = None
         self.val_df = None
         self.test_df = None
@@ -62,6 +61,7 @@ class ClassificationStep:
         return classifier
     
     def train(self, val_frac=1.0):
+        self.complete_df = self.parser.get_complete_df()
         
         if self.simulation:
             self.test_df = self.get_test_df_simulation(test_frac=0.05)
@@ -96,6 +96,7 @@ class ClassificationStep:
             task_classifier.export()
             featurizer_tf.export()
             featurizer_emb.export()
+            task.export_hash_to_label_dict()
             print("val acc for task {} is {}".format(task.name, val_acc))
 
     def load_models(self):
@@ -110,6 +111,7 @@ class ClassificationStep:
             task.featurizer_tf = task_featurizer_tf
             task.featurizer_emb = task_featurizer_emb
             task.is_trained = True
+            task.load_hash_to_label_dict()
             print("loaded models for {} task successfully".format(task.name))
 
     def load_test_df(self):
