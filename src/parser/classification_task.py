@@ -60,8 +60,8 @@ class ClassificationTask:
             return self.label_to_hash_dict[label]
         else:
             self.hash_counter += 1
-            self.label_to_hash_dict[label] = str(self.hash_counter)
-            self.hash_to_label_dict[self.hash_counter] = label
+            self.label_to_hash_dict[label] = self.hash_counter
+            self.hash_to_label_dict[str(self.hash_counter)] = label
 
         return self.label_to_hash_dict[label]
 
