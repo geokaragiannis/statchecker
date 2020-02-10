@@ -33,7 +33,8 @@ class DatasetParser:
         task_dict = dict()
         for task_name, task_value in self.config["classification_tasks"].items():
             task_obj = ClassificationTask(task_value["init_name"], task_value["name"], 
-                                          task_value["hash_name"], task_value["label_task"])
+                                          task_value["hash_name"], task_value["label_task"],
+                                          task_value["priority"])
             task_dict[task_name] = task_obj
         return task_dict
 

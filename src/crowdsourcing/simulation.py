@@ -3,6 +3,7 @@ from src.parser.classification_task import ClassificationTask
 from src.crowdsourcing.claim import Claim
 from src.crowdsourcing.property import Property
 from src.crowdsourcing.value import Value
+from colorama import Fore, Style
 
 
 DATA_PATH = "data/claims_01-23-2020/"
@@ -20,6 +21,7 @@ class Simulation:
         for idx, test_row in test_df.iterrows():
             available_properties = [Property(t.name, task=t) for t in 
                                     list(self.classification_pipeline.classification_tasks_dict.values())]
+            available_properties = sorted(available_properties, key=lambda x: x.task.priority)
             test_claim = Claim(test_row["sent"], test_row["claim"], available_properties)
             self.get_preds_from_claim(test_claim)
             test_claims.append(test_claim)
@@ -53,8 +55,9 @@ class Simulation:
         self.z += not_found_hash
 
     def ask_questions_about_claim(self, claim, test_df_row):
-        print(">> Sentence: {}".format(claim.sent))
-        print(">> Claim: {}".format(claim.claim))
+        print(Fore.RED + ">> Sentence: {}".format(claim.sent))
+        print(Fore.GREEN + ">> Claim: {}".format(claim.claim))
+        print(Style.RESET_ALL)
         for prop in claim.available_properties:
             print(">> Are any of the below correct for the property: {}".format(prop.property_name))
             for idx, value in enumerate(prop.candidate_values):
@@ -62,10 +65,11 @@ class Simulation:
             choice_idx = int(input())
             ground_truth = test_df_row[prop.property_name]
             print("ground truth: ", ground_truth)
-            if prop.candidate_values[choice_idx].value == ground_truth:
+            if str(prop.candidate_values[choice_idx].value) == str(ground_truth):
                 print(">> Great! You got it correctly!")
             else:
                 print(">> You made a mistake")
+        print("\n\n")
 
 
     def run(self):

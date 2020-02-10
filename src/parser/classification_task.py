@@ -5,7 +5,7 @@ row_index, tab, file prediction.
 
 
 class ClassificationTask:
-    def __init__(self, init_name, name, hash_name, label_task, val_acc=0.0):
+    def __init__(self, init_name, name, hash_name, label_task, priority, val_acc=0.0):
         """
         Arguments:
             init_name {str} -- [name that appears in the original csv files]
@@ -13,12 +13,14 @@ class ClassificationTask:
             hash_name {str} -- [name of the column that contains the hash value of the 
                                classification task]
             label_task {str} -- [Classification type. Either "single-label" or "multi-label"]
+            priority {int} -- {a lower number is a more important task}
             val_acc {float} -- [accuracy in the validation set]
         """
         self.init_name = init_name
         self.name = name
         self.hash_name = hash_name
         self.label_task = label_task
+        self.priority = priority
         self.val_acc = val_acc
         # True if we have hashed the values of the Classification Task
         self.has_hash = True
