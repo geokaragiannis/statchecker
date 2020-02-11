@@ -126,7 +126,7 @@ class DatasetParser:
                     ret_set.add(str(w))
             elif item_value:
                 ret_set.add(str(item_value))
-        return tuple(ret_set) if len(ret_set) > 0 else None
+        return "-".join(sorted(ret_set)) if len(ret_set) > 0 else None
     
     def apply_hash(self, row, task):
         """
