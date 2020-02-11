@@ -9,3 +9,5 @@ class Property:
         self.candidate_values = candidate_values
         # ClassificationTask object
         self.task = task
+        # a single Value object that constitutes the correct value
+        self.ground_truth = None

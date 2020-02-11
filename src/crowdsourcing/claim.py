@@ -12,6 +12,21 @@ class Claim:
         self.available_properties = available_properties
         self.verification_cost = ver_cost
         self.derivation_cost = der_cost
+
+    def convert_to_pandas_row(self):
+        """
+        Return a dict with keys the names of the columns and values the 
+        values of the properties, in order to be able to append to train_df
+        """
+        row_dict = dict()
+        row_dict["sent"] = self.sent
+        row_dict["claim"] = self.claim
+        for prop in self.available_properties:
+            row_dict[prop.task.name] = prop.ground_truth
+            if prop.task.has_hash:
+                row_dict[prop.task.hash_name] = prop.task.hash_(prop.ground_truth)
+                
+        return row_dict
     
 
     def get_optimal_property_order(self):
