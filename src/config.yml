@@ -39,3 +39,5 @@ classification_tasks:
 models_dir: "data/exported_models/"
 data_dir: "data/exported_data/"
 test_df_name: "test_df_simulation.csv"
+train_df_name: "train_df.csv"
+val_df_name: "val_df.csv"
