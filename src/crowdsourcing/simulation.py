@@ -9,7 +9,7 @@ from colorama import Fore, Style
 DATA_PATH = "data/claims_01-23-2020/"
 class Simulation:
     def __init__(self, data_path):
-        self.classification_pipeline = ClassificationStep(data_path, simulation=True)
+        self.classification_pipeline = ClassificationStep(data_path, simulation=True, min_samples=1)
         self.z = 0
 
     def create_claims_from_df(self, test_df):
@@ -45,7 +45,7 @@ class Simulation:
                 hash_to_label_dict = prop.task.hash_to_label_dict
                 # print(len(hash_to_label_dict))
                 try:
-                    values_list = [Value(tuple(hash_to_label_dict[str(label)]), prob, prop) for label, prob in zip(pred_labels, pred_probs)]
+                    values_list = [Value(hash_to_label_dict[str(label)], prob, prop) for label, prob in zip(pred_labels, pred_probs)]
                 except: 
                     not_found_hash += 1
                     values_list = [Value(label, prob, prop) for label, prob in zip(pred_labels, pred_probs)]
@@ -63,6 +63,7 @@ class Simulation:
                 print(">> {}.  {} with probability {}".format(idx, value.value, value.prob))
             choice_idx = int(input())
             ground_truth = test_df_row[prop.property_name]
+            prop.ground_truth = ground_truth
             print("ground truth: ", ground_truth)
             if str(prop.candidate_values[choice_idx].value) == str(ground_truth):
                 print(">> Great! You got it correctly!")
@@ -77,24 +78,26 @@ class Simulation:
         train = bool(int(input()))
 
         if train:
-            self.classification_pipeline.train()
+            complete_df = self.classification_pipeline.parser.get_complete_df()
+            self.classification_pipeline.train(complete_df)
+            train_df = self.classification_pipeline.train_df
+            val_df = self.classification_pipeline.val_df
             test_df = self.classification_pipeline.test_df
         else:
             self.classification_pipeline.load_models()
-            test_df = self.classification_pipeline.load_test_df()
+            train_df, val_df, test_df = self.classification_pipeline.load_dfs()
         
+        print("size of training, val and test: {}, {}, {}".format(len(train_df), len(val_df), len(test_df)))
         test_claims = self.create_claims_from_df(test_df)
 
+        claims_to_retrain = []
         for idx, test_claim in enumerate(test_claims):
             test_df_row = test_df.iloc[idx]
             self.ask_questions_about_claim(test_claim, test_df_row)
-        # print(len(test_claims))
-        # print(test_claims[0].sent)
-        # print(test_claims[0].claim)
-        # for prop in test_claims[0].available_properties:
-        #     print("prop name: ", prop.property_name)
-        #     print("values list: ", [(val.value, val.prob) for val in prop.candidate_values])
-
+            claims_to_retrain.append(test_claim)
+            if (idx + 1) % 5 == 0:
+                self.classification_pipeline.retrain(claims_to_retrain)
+                claims_to_retrain = []
 
 if __name__ == "__main__":
     simulation = Simulation(DATA_PATH)
