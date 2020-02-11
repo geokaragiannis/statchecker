@@ -45,6 +45,7 @@ class ClassificationTask:
         self.label_to_hash_dict = dict()
         self.hash_to_label_dict = dict()
         self.hash_to_label_dict_name = self.name + "_hash_to_label_dict.json"
+        self.label_to_hash_dict_name = self.name + "_label_to_hash_dict.json"
         # hash_counter will always be incremented when we add a new label to a task's hash_dict
         self.hash_counter = 0
 
@@ -65,12 +66,23 @@ class ClassificationTask:
 
         return self.label_to_hash_dict[label]
 
-    def export_hash_to_label_dict(self):
-        fname = os.path.join(self.config["models_dir"], self.hash_to_label_dict_name)
-        with open(fname, "w") as fp:
+    def export_hash_dicts(self):
+        fname1 = os.path.join(self.config["models_dir"], self.hash_to_label_dict_name)
+        with open(fname1, "w") as fp:
             json.dump(self.hash_to_label_dict, fp)
 
-    def load_hash_to_label_dict(self):
-        fname = os.path.join(self.config["models_dir"], self.hash_to_label_dict_name)
-        with open(fname, "r") as fp:
+        fname2 = os.path.join(self.config["models_dir"], self.label_to_hash_dict_name)
+        with open(fname2, "w") as fp:
+            json.dump(self.label_to_hash_dict, fp)
+
+    def load_hash_dicts(self):
+        fname1 = os.path.join(self.config["models_dir"], self.hash_to_label_dict_name)
+        with open(fname1, "r") as fp:
             self.hash_to_label_dict = json.load(fp)
+
+        fname2 = os.path.join(self.config["models_dir"], self.label_to_hash_dict_name)
+        with open(fname2, "r") as fp:
+            self.label_to_hash_dict = json.load(fp)
+        # restore the counter after loading
+        if self.hash_to_label_dict:
+            self.hash_counter = int(max(list(self.hash_to_label_dict.keys())))
