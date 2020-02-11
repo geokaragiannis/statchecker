@@ -10,7 +10,7 @@ import scipy
 
 
 class ClassificationStep:
-    def __init__(self, data_path, cv=3, min_samples=1, topn=5, simulation=True):
+    def __init__(self, data_path, cv=3, min_samples=5, topn=5, simulation=True):
         self.cv = cv
         self.min_samples = min_samples
         self.topn = topn
@@ -22,6 +22,9 @@ class ClassificationStep:
         # dict of classification_tasks to be included in the classification.
         self.classification_tasks_dict = self.parser.classification_tasks_dict
         self.tok_driver = TokenizerDriver()
+        # common featurizer objects for all tasks
+        self.featurizer_tf = None
+        self.featurizer_emb = None
         self.complete_df = None
         self.train_df = None
         self.val_df = None
@@ -43,25 +46,32 @@ class ClassificationStep:
         print("saved test_df successfully")
         return test_df
 
-    def get_train_val_test_splits(self, df, task, train_frac=0.9, val_frac=0.5):
+    def get_train_val_test_splits(self, df, train_frac=0.9):
         train_df = df.sample(frac=train_frac)
         # get remaining rows in the dataframe not in train_df
-        val_test_df = train_df.merge(df, how = 'outer', indicator=True).loc[lambda x : x['_merge']=='right_only']
-        train_labels = list(train_df[task.hash_name])
-        # only keep data points, which have a label seen in the training data
-        val_test_df = val_test_df[val_test_df[task.hash_name].isin(train_labels)]
-        val_df = val_test_df.sample(frac=val_frac)
-        test_df = val_test_df.drop(val_df.index)
-        print("No intersection of train, test set: {}".format(len(pd.merge(train_df, val_df, how="inner", on=["sent", "claim"])) == 0))
-        return train_df, val_df, test_df
+        val_df = train_df.merge(df, how = 'outer', indicator=True).loc[lambda x : x['_merge']=='right_only']
+        return train_df, val_df
 
     def train_single_task(self, X_train, y_train, task):
         classifier = ClassifierLinearSVM(task)
         model = classifier.train(X_train, y_train)
         return classifier
-    
-    def train(self, val_frac=1.0):
-        self.complete_df = self.parser.get_complete_df()
+
+    def get_featurizers(self):
+        if self.featurizer_tf is None:
+            self.featurizer_tf = FeatureExtractor(mode="tfidf")
+
+        if self.featurizer_emb is None:
+            self.featurizer_emb = FeatureExtractor(mode="word-embeddings")
+
+        return self.featurizer_tf, self.featurizer_emb
+
+    def set_featurizers(self, f_tf, f_emb):
+        self.featurizer_tf = f_tf
+        self.featurizer_emb = f_emb
+
+    def train(self, df, val_frac=1.0):
+        self.complete_df = df
         
         if self.simulation:
             self.test_df = self.get_test_df_simulation(test_frac=0.05)
@@ -69,23 +79,22 @@ class ClassificationStep:
             self.complete_df = self.test_df.merge(self.complete_df, how = 'outer', indicator=True).loc[lambda x : x['_merge']=='right_only']
             self.complete_df.drop(columns=["_merge"], inplace=True)
 
+        featurizer_tf, featurizer_emb =  self.get_featurizers()
+        self.train_df, self.val_df = self.get_train_val_test_splits(self.complete_df)
+        sents_train = list(self.train_df["sent"])
+        claims_train = list(self.train_df["claim"])
+        X_train = self.get_feature_union(sents_train, claims_train, self.tok_driver, 
+                                             featurizer_emb, featurizer_tf, mode="train")
+        sents_val = list(self.val_df["sent"])
+        claims_val = list(self.val_df["claim"])
+        X_val = self.get_feature_union(sents_val, claims_val, self.tok_driver, featurizer_emb,
+                                        featurizer_tf, mode="test")
+        
         for _, task in self.classification_tasks_dict.items():
             print("Training classifier for task: {}".format(task.name))
-            featurizer_tf = FeatureExtractor(task, mode="tfidf")
-            featurizer_emb = FeatureExtractor(task, mode="word-embeddings")
-            min_samples_df = self.create_min_samples_dataset(self.complete_df, task)
-            train_df, val_df, _ = self.get_train_val_test_splits(min_samples_df, task, 
-                                                                           val_frac=val_frac)
-            sents_train = list(train_df["sent"])
-            claims_train = list(train_df["claim"])
-            X_train = self.get_feature_union(sents_train, claims_train, self.tok_driver, 
-                                             featurizer_emb, featurizer_tf, mode="train")
-            sents_val = list(val_df["sent"])
-            claims_val = list(val_df["claim"])
-            X_val = self.get_feature_union(sents_val, claims_val, self.tok_driver, featurizer_emb,
-                                           featurizer_tf, mode="test")
-            y_train = list(train_df[task.hash_name])
-            y_val = list(val_df[task.hash_name])
+            
+            y_train = list(self.train_df[task.hash_name])
+            y_val = list(self.val_df[task.hash_name])
             task_classifier = self.train_single_task(X_train, y_train, task)
             val_preds, val_acc = task_classifier.get_pred_and_accuracy(X_val, y_val, topn=self.topn)
             task.featurizer_tf = featurizer_tf
@@ -94,30 +103,112 @@ class ClassificationStep:
             task.val_acc = val_acc
             task.is_trained = True
             task_classifier.export()
-            featurizer_tf.export()
-            featurizer_emb.export()
-            task.export_hash_to_label_dict()
+            task.export_hash_dicts()
             print("val acc for task {} is {}".format(task.name, val_acc))
 
+        featurizer_tf.export()
+        featurizer_emb.export()
+
+        # export train_df and val_df to disk
+        helpers.save_df_to_dir(self.config["data_dir"], self.config["train_df_name"], self.train_df)
+        helpers.save_df_to_dir(self.config["data_dir"], self.config["val_df_name"], self.val_df)
+
+    def retrain(self, claims_list):
+        """
+        Given a list of new verified claims, we retrain our model
+        by combining the old training data (if any) with the new data
+        
+        Arguments:
+            claims_list {List of Claim objects} -- [New annotated data from crowdsourcing]
+        """
+        new_data_df = self.transform_claim_list_to_df(claims_list)
+        if self.train_df is None:
+            print("Retraining from 0 training data")
+            self.train_df = new_data_df
+        else:
+            self.train_df = pd.concat([self.train_df, new_data_df], axis=0, ignore_index=True, sort=False)
+        
+        featurizer_tf, featurizer_emb =  self.get_featurizers()
+        # self.train_df, self.val_df = self.get_train_val_test_splits(self.train_df)
+
+        sents_train = list(self.train_df["sent"])
+        claims_train = list(self.train_df["claim"])
+        X_train = self.get_feature_union(sents_train, claims_train, self.tok_driver, 
+                                             featurizer_emb, featurizer_tf, mode="train")
+        print("retraining with train size: ", len(self.train_df))
+        sents_val = list(self.val_df["sent"])
+        claims_val = list(self.val_df["claim"])
+        X_val = self.get_feature_union(sents_val, claims_val, self.tok_driver, featurizer_emb,
+                                        featurizer_tf, mode="test")
+        
+        self.set_featurizers(featurizer_tf, featurizer_emb)
+
+        for _, task in self.classification_tasks_dict.items():
+            print("Retraining classifier for task: {}".format(task.name))
+            
+            y_train = list(self.train_df[task.hash_name])
+            y_val = list(self.val_df[task.hash_name])
+            task_classifier = self.train_single_task(X_train, y_train, task)
+            val_preds, val_acc = task_classifier.get_pred_and_accuracy(X_val, y_val, topn=self.topn)
+            task.featurizer_tf = featurizer_tf
+            task.featurizer_emb = featurizer_emb
+            task.classifier = task_classifier
+            task.val_acc = val_acc
+            task.is_trained = True
+            task_classifier.export()
+            task.export_hash_dicts()
+            print("val acc for task {} is {}".format(task.name, val_acc))
+
+        featurizer_tf.export()
+        featurizer_emb.export()
+
+        # export new train_df and val_df to disk
+        helpers.save_df_to_dir(self.config["data_dir"], self.config["train_df_name"], self.train_df)
+        helpers.save_df_to_dir(self.config["data_dir"], self.config["val_df_name"], self.val_df)
+
+
+    def transform_claim_list_to_df(self, claims_list):
+        """
+        Transforms a list of claims objects into a Dataframe that has the same format
+        as the train_df
+        
+        Arguments:
+            claims_list {list of Claim objects} -- [description]
+        Returns:
+            pandas Dataframe with the new training data
+        """
+        # get columns from the properties of a claim
+        if len(claims_list) > 0:
+            cols = list(claims_list[0].convert_to_pandas_row().keys())
+        ret_df = pd.DataFrame(columns=cols)
+        for claim in claims_list:
+            row_dict = claim.convert_to_pandas_row()
+            ret_df = ret_df.append(row_dict,  ignore_index=True)
+        print("successfully added {} new data points".format(len(ret_df)))
+
+        return ret_df
+
     def load_models(self):
+        common_featurizer_tf =  FeatureExtractor(mode="tfidf")
+        common_featurizer_tf.load()
+        common_featurizer_emb = FeatureExtractor(mode="word-embeddings")
+        common_featurizer_emb.load()
         for _, task in self.classification_tasks_dict.items():
             task_classifier = ClassifierLinearSVM(task)
             task_classifier.load()
-            task_featurizer_tf = FeatureExtractor(task, mode="tfidf")
-            task_featurizer_tf.load()
-            task_featurizer_emb = FeatureExtractor(task, mode="word-embeddings")
-            task_featurizer_tf.load()
             task.classifier = task_classifier
-            task.featurizer_tf = task_featurizer_tf
-            task.featurizer_emb = task_featurizer_emb
+            task.featurizer_tf = common_featurizer_tf
+            task.featurizer_emb = common_featurizer_emb
             task.is_trained = True
-            task.load_hash_to_label_dict()
+            task.load_hash_dicts()
             print("loaded models for {} task successfully".format(task.name))
 
-    def load_test_df(self):
+    def load_dfs(self):
         self.test_df = helpers.load_df_from_dir(self.config["data_dir"], self.config["test_df_name"])
-        print("loaded test_df successfully")
-        return self.test_df
+        self.train_df = helpers.load_df_from_dir(self.config["data_dir"], self.config["train_df_name"])
+        self.val_df = helpers.load_df_from_dir(self.config["data_dir"], self.config["val_df_name"])
+        print("loaded train_df, val_df and test_df successfully")
+        return self.train_df, self.val_df, self.test_df
 
     @staticmethod
     def concat_features(features_s, features_c):
