@@ -10,12 +10,12 @@ import scipy
 
 
 class ClassificationStep:
-    def __init__(self, data_path, cv=3, min_samples=5, topn=5, simulation=True):
-        self.cv = cv
+    def __init__(self, data_path, min_samples=5, topn=5, simulation=True, export=True):
         self.min_samples = min_samples
         self.topn = topn
         self.data_path = data_path
         self.simulation = simulation
+        self.export = export
         self.config = helpers.load_yaml("src/config.yml")
 
         self.parser = DatasetParser(self.data_path)
@@ -42,8 +42,9 @@ class ClassificationStep:
             test_frac {float} -- [Fraction of the whole data for test_df] (default: {0.05})
         """
         test_df = self.complete_df.sample(frac=test_frac)
-        helpers.save_df_to_dir(self.config["data_dir"], self.config["test_df_name"], test_df)
-        print("saved test_df successfully")
+        if self.export:
+            helpers.save_df_to_dir(self.config["data_dir"], self.config["test_df_name"], test_df)
+            print("saved test_df successfully")
         return test_df
 
     def get_train_val_test_splits(self, df, train_frac=0.9):
@@ -70,17 +71,14 @@ class ClassificationStep:
         self.featurizer_tf = f_tf
         self.featurizer_emb = f_emb
 
-    def train(self, df, val_frac=1.0):
-        self.complete_df = df
-        
-        if self.simulation:
-            self.test_df = self.get_test_df_simulation(test_frac=0.05)
-            # only keep data not picked for testing
-            self.complete_df = self.test_df.merge(self.complete_df, how = 'outer', indicator=True).loc[lambda x : x['_merge']=='right_only']
-            self.complete_df.drop(columns=["_merge"], inplace=True)
+    def train_for_active(self, train_df, val_df):
+
+        self.train_df = train_df
+        self.val_df = val_df
+        print("training on {} number of samples".format(len(self.train_df)))
+        print("valiadting on {} number of samples".format(len(self.val_df)))
 
         featurizer_tf, featurizer_emb =  self.get_featurizers()
-        self.train_df, self.val_df = self.get_train_val_test_splits(self.complete_df)
         sents_train = list(self.train_df["sent"])
         claims_train = list(self.train_df["claim"])
         X_train = self.get_feature_union(sents_train, claims_train, self.tok_driver, 
@@ -102,16 +100,61 @@ class ClassificationStep:
             task.classifier = task_classifier
             task.val_acc = val_acc
             task.is_trained = True
-            task_classifier.export()
-            task.export_hash_dicts()
+            if self.export:
+                task_classifier.export()
+                task.export_hash_dicts()
             print("val acc for task {} is {}".format(task.name, val_acc))
 
-        featurizer_tf.export()
-        featurizer_emb.export()
+        if self.export:
+            featurizer_tf.export()
+            featurizer_emb.export()
+            # export train_df and val_df to disk
+            helpers.save_df_to_dir(self.config["data_dir"], self.config["train_df_name"], self.train_df)
+            helpers.save_df_to_dir(self.config["data_dir"], self.config["val_df_name"], self.val_df)
 
-        # export train_df and val_df to disk
-        helpers.save_df_to_dir(self.config["data_dir"], self.config["train_df_name"], self.train_df)
-        helpers.save_df_to_dir(self.config["data_dir"], self.config["val_df_name"], self.val_df)
+    def train(self, df, train_frac=0.9):
+        self.complete_df = df
+        
+        if self.simulation:
+            self.test_df = self.get_test_df_simulation(test_frac=0.05)
+            # only keep data not picked for testing
+            self.complete_df = self.test_df.merge(self.complete_df, how = 'outer', indicator=True).loc[lambda x : x['_merge']=='right_only']
+            self.complete_df.drop(columns=["_merge"], inplace=True)
+
+        featurizer_tf, featurizer_emb =  self.get_featurizers()
+        self.train_df, self.val_df = self.get_train_val_test_splits(self.complete_df, train_frac=train_frac)
+        sents_train = list(self.train_df["sent"])
+        claims_train = list(self.train_df["claim"])
+        X_train = self.get_feature_union(sents_train, claims_train, self.tok_driver, 
+                                             featurizer_emb, featurizer_tf, mode="train")
+        sents_val = list(self.val_df["sent"])
+        claims_val = list(self.val_df["claim"])
+        X_val = self.get_feature_union(sents_val, claims_val, self.tok_driver, featurizer_emb,
+                                        featurizer_tf, mode="test")
+        
+        for _, task in self.classification_tasks_dict.items():
+            print("Training classifier for task: {}".format(task.name))
+            
+            y_train = list(self.train_df[task.hash_name])
+            y_val = list(self.val_df[task.hash_name])
+            task_classifier = self.train_single_task(X_train, y_train, task)
+            val_preds, val_acc = task_classifier.get_pred_and_accuracy(X_val, y_val, topn=self.topn)
+            task.featurizer_tf = featurizer_tf
+            task.featurizer_emb = featurizer_emb
+            task.classifier = task_classifier
+            task.val_acc = val_acc
+            task.is_trained = True
+            if self.export:
+                task_classifier.export()
+                task.export_hash_dicts()
+            print("val acc for task {} is {}".format(task.name, val_acc))
+
+        if self.export:
+            featurizer_tf.export()
+            featurizer_emb.export()
+            # export train_df and val_df to disk
+            helpers.save_df_to_dir(self.config["data_dir"], self.config["train_df_name"], self.train_df)
+            helpers.save_df_to_dir(self.config["data_dir"], self.config["val_df_name"], self.val_df)
 
     def retrain(self, claims_list):
         """
@@ -155,16 +198,17 @@ class ClassificationStep:
             task.classifier = task_classifier
             task.val_acc = val_acc
             task.is_trained = True
-            task_classifier.export()
-            task.export_hash_dicts()
+            if self.export:
+                task_classifier.export()
+                task.export_hash_dicts()
             print("val acc for task {} is {}".format(task.name, val_acc))
 
-        featurizer_tf.export()
-        featurizer_emb.export()
-
-        # export new train_df and val_df to disk
-        helpers.save_df_to_dir(self.config["data_dir"], self.config["train_df_name"], self.train_df)
-        helpers.save_df_to_dir(self.config["data_dir"], self.config["val_df_name"], self.val_df)
+        if self.export:
+            featurizer_tf.export()
+            featurizer_emb.export()
+            # export new train_df and val_df to disk
+            helpers.save_df_to_dir(self.config["data_dir"], self.config["train_df_name"], self.train_df)
+            helpers.save_df_to_dir(self.config["data_dir"], self.config["val_df_name"], self.val_df)
 
 
     def transform_claim_list_to_df(self, claims_list):
