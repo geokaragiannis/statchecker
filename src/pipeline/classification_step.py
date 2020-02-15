@@ -88,6 +88,8 @@ class ClassificationStep:
         X_val = self.get_feature_union(sents_val, claims_val, self.tok_driver, featurizer_emb,
                                         featurizer_tf, mode="test")
         
+        self.set_featurizers(featurizer_tf, featurizer_emb)
+
         for _, task in self.classification_tasks_dict.items():
             print("Training classifier for task: {}".format(task.name))
             
