@@ -1,6 +1,6 @@
 from src.Book_FactChecker import Book_FactChecker
 from src.QueryGenerator import QueryGenerator
-
+from src.TableBuilder import TableBuilder
 
 class FactChecker:
 
@@ -52,6 +52,8 @@ class FactChecker:
         self.years=classifier_output['years']
         self.domains={'row_indices':self.row_indices,'years':self.years}
         self.formulas=classifier_output['formulas']
+        self.bfcs={k:None for k in self.files}
+        self.solutions=None
     def FactCheck(self,true_value):
         solutions=[]
         for file in self.files:
@@ -59,12 +61,27 @@ class FactChecker:
             for formula in self.formulas:
                 sols=bfc.book_FactCheck(formula,true_value)
                 solutions.append(sols)
+            self.bfcs[file]=bfc
         solutions_flatenned=[xxx  for x in solutions for xx in x for xxx in xx ]
 
         return solutions_flatenned
     def generate_queries(self,solutions,formula2query):
-        QG=QueryGenerator(solutions)
+        self.solutions=solutions
+        QG=QueryGenerator(self.solutions)
         return QG.generate_queries(formula2query)
+    
+    def execute_query(self,query):
+        file=self.solutions[0]['generic_variables']['a']['file']
+        tab=self.solutions[0]['generic_variables']['a']['tab']
+        bfc=self.bfcs[file]#.sfcs[tab]
+        tb=TableBuilder(bfc)
+        tb.build_table()
+        return tb.query_table(query)
+
+    def release_mem(self):
+        for x in self.bfcs:
+            self.bfcs[x].book.book.close()
+            del self.bfcs[x].book.book
 
 
 

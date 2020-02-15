@@ -24,6 +24,7 @@ class QueryGenerator:
 
     """
       
+
     def __init__(self,solutions):
         self.solutions=solutions
         
@@ -40,8 +41,8 @@ class QueryGenerator:
             for key in gvs :
                 
                 gv_dict=gvs[key]
-                lu_query_dict[key]='SELECT '+str(gv_dict['year'])+" FROM "+gv_dict['file']+'!!'+gv_dict['tab']+' WHERE UVN=='+ \
-                     "'"+gv_dict['row_index']+'\';'
+                lu_query_dict[key]='SELECT '+'Y'+str(gv_dict['year'])+" FROM df"+' WHERE RowIndex='+ \
+                     "'"+gv_dict['row_index']+'\''
                 value_dict[key]=str(gv_dict['value'])
                 
             
@@ -58,7 +59,13 @@ class QueryGenerator:
             
             for key in yvs:
                 query_value=query_value.replace(key,str(yvs[key]))
+            if(formula=='a'):
+                query_formula=query_formula[1:-1]
+                query_value=query_value[1:-1]
                 
             queries.append([query_formula,query_value])
         return queries
+    
+	    
+
             

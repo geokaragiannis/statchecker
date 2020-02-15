@@ -30,13 +30,21 @@ class Book:
     """
 
 
-
-        
+    
+    cached_books={}    
     def __init__(self,file):
-        print("Loading {}.".format(file))
-        self.book=openpyxl.load_workbook(file)
-        self.book_val=openpyxl.load_workbook(file,data_only=True)
-        print("Finished loading {}.".format(file))
+
+        if(file in Book.cached_books):
+            print("Loading file from cache.")
+            self.book=Book.cached_books[file][0]
+            self.book_val=Book.cached_books[file][1]
+
+        else:
+            print("Loading {}.".format(file))
+            self.book=openpyxl.load_workbook(file)
+            self.book_val=openpyxl.load_workbook(file,data_only=True)
+            Book.cached_books[file]=[self.book,self.book_val]
+            print("Finished loading {}.".format(file))
         self.file=file
         self.sheetnames=(self.book).sheetnames
         self.sheets_dict={sheetname:None for sheetname in self.sheetnames}

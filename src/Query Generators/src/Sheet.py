@@ -125,18 +125,39 @@ class Sheet:
     
     
     def find_UVN_cell(self):
-        
+
         if(self.get_cell_value('D4') in Sheet.uvn_titles):
             self.uvn_coordinate=self.sheet['D4']
-        
+            return
+
         if(self.get_cell_value('C5') in Sheet.uvn_titles):
             self.uvn_coordinate=self.sheet['C5']
-            
+            return
+
         if(self.get_cell_value('C4') in Sheet.uvn_titles):
             self.uvn_coordinate=self.sheet['C4']
-       # if(self.uvn_coordinate):
-       #     print("Found UVN cell {}".format(self.uvn_coordinate.coordinate))
+            return
             
+            
+        else:
+                   
+            cols=islice(self.sheet.columns,15)
+
+            d={}
+
+            for col in cols:
+                col_letter=col[0].column_letter
+                #print(col_letter)
+                d[col_letter]=0
+                for cell in col:
+                    if(cell.value and isinstance(cell.value,str) and '_' in cell.value):
+                        d[col_letter]+=1
+            max_col_letter=sorted(d.items(),key=lambda x:-x[1])[0][0]
+            #print(d)
+            self.uvn_coordinate=self.sheet[max_col_letter+'1']
+            return
+
+                
             
 
     def search_row_index_cell(self,row_index):
@@ -149,7 +170,10 @@ class Sheet:
             
             for i in range(self.uvn_row,self.sheet.max_row+1):
                 cell_coordinate=self.uvn_column+str(i)
-                if(self.sheet[cell_coordinate].value==row_index):
+                if(self.sheet[cell_coordinate].value==row_index.lower()):
+                    return self.sheet[cell_coordinate]
+ 
+                if(self.sheet[cell_coordinate].value and (str(self.sheet[cell_coordinate].value).lower() == row_index.lower())):
                     return self.sheet[cell_coordinate]
                     
            # print("Didn't find row index")
@@ -166,7 +190,7 @@ class Sheet:
         
         for row in first_n_rows:
             for cell in row:
-                if(cell.value==year and cell.column<94):
+                if(cell.value==year):# and cell.column<94):
                     year_cells.append(cell)
         return year_cells
     

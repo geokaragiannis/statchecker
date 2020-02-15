@@ -55,31 +55,24 @@ class Book_FactChecker:
         
         self.row_indices=domains['row_indices']
         self.years=domains['years']
-
-
-
-        
+        self.sfcs={k:None for k in self.book.sheetnames}
+        self.solutions=[]
+       
     def book_FactCheck(self,formula,true_value):
-
-
-	#change string formula to Formula_Calculator object        
+        
         self.formula=Formula_Calculator(formula)
         
         file_solutions=[]
-        
+        self.domain_cells=[]
         for sheetname in self.book.sheetnames:
          #   print(sheetname)
-
             sheet=self.book.get_sheet(sheetname)
-
-
-            # Fact Check object for each Sheet
             sfc=Sheet_FactChecker(sheet,self.row_indices,self.years,self.formula)
+            self.sfcs[sheetname]=sfc
+            self.domain_cells.extend(sfc.domain_cells)
 
-            # brute force domains to find value equal to true_value
-            sheet_solution=self.formula.verify_formula(sfc.domain_cells,true_value)
+        sheet_solution=self.formula.verify_formula(self.domain_cells,true_value)
+        file_solutions.append(sheet_solution)
 
-
-            file_solutions.append(sheet_solution)
-
+        self.solutions=self.formula.solutions
         return file_solutions
