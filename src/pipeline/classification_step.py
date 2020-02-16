@@ -76,17 +76,18 @@ class ClassificationStep:
         self.train_df = train_df
         self.val_df = val_df
         print("training on {} number of samples".format(len(self.train_df)))
-        print("valiadting on {} number of samples".format(len(self.val_df)))
 
         featurizer_tf, featurizer_emb =  self.get_featurizers()
         sents_train = list(self.train_df["sent"])
         claims_train = list(self.train_df["claim"])
         X_train = self.get_feature_union(sents_train, claims_train, self.tok_driver, 
                                              featurizer_emb, featurizer_tf, mode="train")
-        sents_val = list(self.val_df["sent"])
-        claims_val = list(self.val_df["claim"])
-        X_val = self.get_feature_union(sents_val, claims_val, self.tok_driver, featurizer_emb,
-                                        featurizer_tf, mode="test")
+        if val_df is not None:
+            print("validating on {} number of samples".format(len(self.val_df)))
+            sents_val = list(self.val_df["sent"])
+            claims_val = list(self.val_df["claim"])
+            X_val = self.get_feature_union(sents_val, claims_val, self.tok_driver, featurizer_emb,
+                                            featurizer_tf, mode="test")
         
         self.set_featurizers(featurizer_tf, featurizer_emb)
 
@@ -94,18 +95,19 @@ class ClassificationStep:
             print("Training classifier for task: {}".format(task.name))
             
             y_train = list(self.train_df[task.hash_name])
-            y_val = list(self.val_df[task.hash_name])
             task_classifier = self.train_single_task(X_train, y_train, task)
-            val_preds, val_acc = task_classifier.get_pred_and_accuracy(X_val, y_val, topn=self.topn)
             task.featurizer_tf = featurizer_tf
             task.featurizer_emb = featurizer_emb
             task.classifier = task_classifier
-            task.val_acc = val_acc
+            if val_df is not None:
+                y_val = list(self.val_df[task.hash_name])
+                val_preds, val_acc = task_classifier.get_pred_and_accuracy(X_val, y_val, topn=self.topn)
+                task.val_acc = val_acc
             task.is_trained = True
             if self.export:
                 task_classifier.export()
                 task.export_hash_dicts()
-            print("val acc for task {} is {}".format(task.name, val_acc))
+            print("val acc for task {} is {}".format(task.name, task.val_acc))
 
         if self.export:
             featurizer_tf.export()

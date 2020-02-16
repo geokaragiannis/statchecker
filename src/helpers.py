@@ -40,6 +40,8 @@ def load_model_from_dir(dir, fname):
     return pickle.load(f)
 
 def save_df_to_dir(dir, fname, df):
+    if not df:
+        return
     safe_mkdir(dir)
     fpath = os.path.join(dir, fname)
     df.to_csv(fpath, index=False)
