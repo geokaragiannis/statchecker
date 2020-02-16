@@ -1,4 +1,5 @@
 from src.pipeline.classification_step import ClassificationStep
+from src.pipeline.clustering_step import ClusteringStep
 from src.parser.classification_task import ClassificationTask
 from src.crowdsourcing.claim import Claim
 from src.crowdsourcing.property import Property
@@ -12,8 +13,15 @@ DATA_PATH = "data/claims_01-23-2020/"
 
 
 class ActiveLearningStep:
-    def __init__(self, data_path):
+    def __init__(self, data_path, num_clusters=10):
         self.classification_pipeline = ClassificationStep(data_path, simulation=False, export=False)
+        self.num_clusters = num_clusters
+        self.clustering_pipeline = ClusteringStep(num_clusters=num_clusters)
+        
+
+    def cluster_claims(self, df, num_clusters=10):
+        clusters_list = self.clustering_pipeline.cluster_claims(df, num_clusters=num_clusters)
+        df["cluster_id"] = clusters_list
 
     def select_next_k_random(self, df, k=100):
         """
@@ -23,7 +31,7 @@ class ActiveLearningStep:
             df {DataFrame}
             k {int} -- [number of claims to select] (default: {100})
         """
-        if len(df) <= k:
+        if len(df) <= (1.5)*k:
             return df
         return df.sample(n=k)
 
@@ -68,7 +76,7 @@ class ActiveLearningStep:
         df["unsure"] = avg_across_tasks
         sorted_df = df.sort_values(by=["unsure"], ascending=False)
         df.drop(columns=["unsure"], inplace=True)
-        if len(sorted_df) > k:
+        if len(sorted_df) > 1.5*k:
             return sorted_df.head(k)
         else:
             return sorted_df
@@ -81,7 +89,7 @@ class ActiveLearningStep:
         df["unsure"] = avg_across_tasks
         sorted_df = df.sort_values(by=["unsure"], ascending=True)
         df.drop(columns=["unsure"], inplace=True)
-        if len(sorted_df) > k:
+        if len(sorted_df) > 1.5*k:
             return sorted_df.head(k)
         else:
             return sorted_df
@@ -106,6 +114,60 @@ class ActiveLearningStep:
         val_acc_df = pd.DataFrame(val_acc_list)
         val_acc_df.to_csv(fpath, index=False)
 
+    def handle_cluster_one_model(self, train_df, cluster_df, cluster_id, k=100):
+        """
+        Here we have one set of property classifiers for ALL clusters
+        For this cluster, receive a trained model already, and pick the next
+        k claims for which we are most unsure about based on the previosuly 
+        trained model
+        
+        Arguments:
+            train_df {DataFrame} -- [sents and claims from previous trainings]
+            cluster_df {Dataframe} -- [sents and claims for this current cluster]
+            cluster_id {str} -- [the id of the cluster]
+        
+        Keyword Arguments:
+            k {int} -- [number of claims to select next] (default: {100})
+        Returns:
+            the trained dataframe, which now includes the whole cluster 
+            and a list of validation acciracies dictionaries for each property
+        """
+        cluster_val_accuracy_list = []
+        while len(cluster_df) != 0:
+            next_k_df = self.select_next_k_most_unsure(cluster_df, k=k)
+            self.classification_pipeline.train_for_active(train_df, next_k_df)
+            train_df = pd.concat([train_df, next_k_df], axis=0, ignore_index=True,
+                                 sort=False)
+            cluster_df = train_df.merge(cluster_df, how = 'outer', indicator=True).loc[lambda x : x['_merge']=='right_only']
+            cluster_df.drop(columns=["_merge"], inplace=True)
+            property_val_accuracy_dict = dict()
+            for task_name, task in self.classification_pipeline.classification_tasks_dict.items():
+                property_val_accuracy_dict[task_name] = task.val_acc
+            cluster_val_accuracy_list.append(property_val_accuracy_dict)
+        return train_df, cluster_val_accuracy_list
+            
+
+    def run_clustering_experiment(self, k=100):
+        # list of dicts, where for each property we keep the val_accuracy
+        val_accuracy_list = []
+        remaining_df = self.classification_pipeline.parser.get_complete_df()
+        train_df = self.select_next_k_random(remaining_df, k=k)
+        # train initial model with 100 random claims
+        self.classification_pipeline.train_for_active(train_df, None)
+        remaining_df = train_df.merge(remaining_df, how = 'outer', indicator=True).loc[lambda x : x['_merge']=='right_only']
+        remaining_df.drop(columns=["_merge"], inplace=True)
+        self.cluster_claims(remaining_df)
+        grouped_df = remaining_df.groupby("cluster_id")
+        # go through each cluster (starting from the largest)
+        for cluster_id, cluster_df in sorted(grouped_df, key=lambda x: len(x[1]), reverse=True):
+            print("\n cluster id: {} \n".format(cluster_id))
+            print("size of cluster: ", len(cluster_df))
+            train_df, cluster_val_acc_list = self.handle_cluster_one_model(train_df, cluster_df, cluster_id)
+            val_accuracy_list.extend(cluster_val_acc_list)
+
+        fname = "val_accuracy_list_cluster_one_model_{}_clusters.csv".format(self.num_clusters)
+        self.export_val_acc_list_to_csv(val_accuracy_list, os.path.join("data", "active_learning",
+                                        fname))
     
     def run_sure_experiment(self, k=100):
         """
@@ -220,6 +282,7 @@ class ActiveLearningStep:
 
 
 if __name__ == "__main__":
-    active_learning = ActiveLearningStep(DATA_PATH)
+    active_learning = ActiveLearningStep(DATA_PATH, num_clusters=8)
     # print(active_learning.run_random_experiment())
-    print(active_learning.run_sure_experiment())
+    # print(active_learning.run_sure_experiment())
+    active_learning.run_clustering_experiment()
