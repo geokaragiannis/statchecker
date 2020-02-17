@@ -14,6 +14,7 @@ DATA_PATH = "data/claims_01-23-2020/"
 
 class ActiveLearningStep:
     def __init__(self, data_path, num_clusters=10):
+        self.data_path = data_path
         self.classification_pipeline = ClassificationStep(data_path, simulation=False, export=False)
         self.num_clusters = num_clusters
         self.clustering_pipeline = ClusteringStep(num_clusters=num_clusters)
@@ -35,7 +36,7 @@ class ActiveLearningStep:
             return df
         return df.sample(n=k)
 
-    def get_preds_from_df(self, df):
+    def get_preds_from_df(self, df, class_pipeline):
         """
         Returns the predictions for a given dataframe for each classification task
         
@@ -47,16 +48,16 @@ class ActiveLearningStep:
         sents = df["sent"]
         claims = df["claim"]
 
-        featurizer_tf = self.classification_pipeline.featurizer_tf
-        featurizer_emb = self.classification_pipeline.featurizer_emb
+        featurizer_tf = class_pipeline.featurizer_tf
+        featurizer_emb = class_pipeline.featurizer_emb
 
-        num_class_tasks = len(self.classification_pipeline.classification_tasks_dict.items())
+        num_class_tasks = len(class_pipeline.classification_tasks_dict.items())
         # each row will have the first pred prob for each task. Each column is the task
         first_pred_matrix = np.zeros((len(df), num_class_tasks))
-        features = self.classification_pipeline.get_feature_union(sents, claims, self.classification_pipeline.tok_driver, 
+        features = class_pipeline.get_feature_union(sents, claims, class_pipeline.tok_driver, 
                                                            featurizer_emb, featurizer_tf, mode="test")
         task_num = 0
-        for task_name, task in self.classification_pipeline.classification_tasks_dict.items():
+        for task_name, task in class_pipeline.classification_tasks_dict.items():
             classifier = task.classifier
             
             preds_list = classifier.predict_batch_top_n(features, topn=5)
@@ -68,9 +69,9 @@ class ActiveLearningStep:
         return first_pred_matrix
         
 
-    def select_next_k_most_unsure(self, df, k=100):
+    def select_next_k_most_unsure(self, df, class_pipeline, k=100):
         print("\n getting preds of size: ", len(df))
-        preds_matrix = self.get_preds_from_df(df)
+        preds_matrix = self.get_preds_from_df(df, class_pipeline)
         # sort by computing the average pred prob across tasks
         avg_across_tasks = np.average(preds_matrix, axis=1)
         df["unsure"] = avg_across_tasks
@@ -81,9 +82,9 @@ class ActiveLearningStep:
         else:
             return sorted_df
 
-    def select_next_k_most_sure(self, df, k=100):
+    def select_next_k_most_sure(self, df, class_pipeline, k=100):
         print("\n getting preds of size: ", len(df))
-        preds_matrix = self.get_preds_from_df(df)
+        preds_matrix = self.get_preds_from_df(df, class_pipeline)
         # sort by computing the average pred prob across tasks
         avg_across_tasks = np.average(preds_matrix, axis=1)
         df["unsure"] = avg_across_tasks
@@ -134,7 +135,7 @@ class ActiveLearningStep:
         """
         cluster_val_accuracy_list = []
         while len(cluster_df) != 0:
-            next_k_df = self.select_next_k_most_unsure(cluster_df, k=k)
+            next_k_df = self.select_next_k_most_unsure(cluster_df, self.classification_pipeline, k=k)
             self.classification_pipeline.train_for_active(train_df, next_k_df)
             train_df = pd.concat([train_df, next_k_df], axis=0, ignore_index=True,
                                  sort=False)
@@ -147,7 +148,7 @@ class ActiveLearningStep:
         return train_df, cluster_val_accuracy_list
             
 
-    def run_clustering_experiment(self, k=100):
+    def run_clustering_experiment_one_model(self, k=100):
         # list of dicts, where for each property we keep the val_accuracy
         val_accuracy_list = []
         remaining_df = self.classification_pipeline.parser.get_complete_df()
@@ -156,7 +157,7 @@ class ActiveLearningStep:
         self.classification_pipeline.train_for_active(train_df, None)
         remaining_df = train_df.merge(remaining_df, how = 'outer', indicator=True).loc[lambda x : x['_merge']=='right_only']
         remaining_df.drop(columns=["_merge"], inplace=True)
-        self.cluster_claims(remaining_df)
+        self.cluster_claims(remaining_df, num_clusters=self.num_clusters)
         grouped_df = remaining_df.groupby("cluster_id")
         # go through each cluster (starting from the largest)
         for cluster_id, cluster_df in sorted(grouped_df, key=lambda x: len(x[1]), reverse=True):
@@ -168,7 +169,51 @@ class ActiveLearningStep:
         fname = "val_accuracy_list_cluster_one_model_{}_clusters.csv".format(self.num_clusters)
         self.export_val_acc_list_to_csv(val_accuracy_list, os.path.join("data", "active_learning",
                                         fname))
-    
+
+    def handle_cluster_many_models(self, cluster_df, class_pipeline, k=100):
+        init_iter = True
+        train_df = None
+        cluster_val_accuracy_list = []
+        while len(cluster_df) != 0:
+            if init_iter:
+                print("Init training for cluster")
+                train_df = self.select_next_k_random(cluster_df, k=20)
+                class_pipeline.train_for_active(train_df, None)
+                init_iter = False
+            else:
+                next_k_df = self.select_next_k_most_unsure(cluster_df, class_pipeline, k=k)
+                class_pipeline.train_for_active(train_df, next_k_df)
+                train_df = pd.concat([train_df, next_k_df], axis=0, ignore_index=True,
+                                      sort=False)
+                property_val_accuracy_dict = dict()
+                for task_name, task in class_pipeline.classification_tasks_dict.items():
+                    property_val_accuracy_dict[task_name] = task.val_acc
+                cluster_val_accuracy_list.append(property_val_accuracy_dict)
+            
+            cluster_df = train_df.merge(cluster_df, how = 'outer', indicator=True).loc[lambda x : x['_merge']=='right_only']
+            cluster_df.drop(columns=["_merge"], inplace=True)
+
+        return cluster_val_accuracy_list
+
+
+    def run_clustering_experiment_many_models(self, k=100):
+        # list of dicts, where for each property we keep the val_accuracy
+        val_accuracy_list = []
+        complete_df = self.classification_pipeline.parser.get_complete_df()
+        self.cluster_claims(complete_df, num_clusters=self.num_clusters)
+        grouped_df = complete_df.groupby("cluster_id")
+        clusters_class_pipeline_dict = self.clustering_pipeline.get_clusters_class_pipeline_obj(self.data_path)
+        for cluster_id, cluster_df in sorted(grouped_df, key=lambda x: len(x[1]), reverse=True):
+            print("\n cluster id: {} \n".format(cluster_id))
+            print("size of cluster: ", len(cluster_df))
+            class_pipeline = clusters_class_pipeline_dict[cluster_id]
+            cluster_val_acc_list = self.handle_cluster_many_models(cluster_df, class_pipeline, k=k)
+            val_accuracy_list.extend(cluster_val_acc_list)
+
+        fname = "val_accuracy_list_cluster_many_model_{}_clusters.csv".format(self.num_clusters)
+        self.export_val_acc_list_to_csv(val_accuracy_list, os.path.join("data", "active_learning",
+                                        fname))
+
     def run_sure_experiment(self, k=100):
         """
         Run an ective learning experiment where we choose the next k questions to ask
@@ -189,7 +234,7 @@ class ActiveLearningStep:
                 next_k_df = self.select_next_k_random(remaining_df, k=k)
             else:
                 print("unsure choice of next k")
-                next_k_df = self.select_next_k_most_sure(remaining_df, k=k)
+                next_k_df = self.select_next_k_most_sure(remaining_df, self.classification_pipeline, k=k)
 
             init_iter = False   
             self.classification_pipeline.train_for_active(train_df, next_k_df)
@@ -230,7 +275,7 @@ class ActiveLearningStep:
                 next_k_df = self.select_next_k_random(remaining_df, k=k)
             else:
                 print("unsure choice of next k")
-                next_k_df = self.select_next_k_most_unsure(remaining_df, k=k)
+                next_k_df = self.select_next_k_most_unsure(remaining_df, self.classification_pipeline, k=k)
 
             init_iter = False   
             self.classification_pipeline.train_for_active(train_df, next_k_df)
@@ -282,7 +327,7 @@ class ActiveLearningStep:
 
 
 if __name__ == "__main__":
-    active_learning = ActiveLearningStep(DATA_PATH, num_clusters=8)
+    active_learning = ActiveLearningStep(DATA_PATH, num_clusters=5)
     # print(active_learning.run_random_experiment())
     # print(active_learning.run_sure_experiment())
-    active_learning.run_clustering_experiment()
+    active_learning.run_clustering_experiment_many_models()
