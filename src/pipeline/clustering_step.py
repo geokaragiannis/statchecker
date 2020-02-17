@@ -1,4 +1,5 @@
 from src.parser.dataset_parser import DatasetParser
+from src.pipeline.classification_step import ClassificationStep
 from src.tokenizer.tokenizer_driver import TokenizerDriver
 from src.featurizer.feature_extractor import FeatureExtractor
 from src.cluster.kmeans_cluster import KmeansCluster
@@ -40,6 +41,19 @@ class ClusteringStep:
         X = self.get_feature_union(sents, claims, self.tok_driver, 
                                    featurizer_emb, featurizer_tf, mode="train")
         return self.clusterer.get_clusters(X)
+
+    def get_clusters_class_pipeline_obj(self, data_path):
+        """
+        For each cluster_id create a classificationStep object, which will 
+        hold the logic for creating specific classifiers for the clusters
+        
+        Arguments:
+            data_path {str} -- needed for creating a classification step obj.
+        """
+        ret_dict = dict()
+        for label in self.clusterer.kmeans.labels_:
+            ret_dict[label] = ClassificationStep(data_path, simulation=False, export=False)
+        return ret_dict
 
     @staticmethod
     def concat_features(features_s, features_c):
