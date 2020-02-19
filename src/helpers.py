@@ -91,6 +91,22 @@ def get_files_from_dir(basepath):
             files.append(os.path.join(basepath, entry))
     return files
 
+def load_contraint_file(fname):
+    """
+    returns a dict from the json of the contraint file
+    
+    Arguments:
+        fname {str} -- [file name]
+    """
+    constraint_file = os.path.join(CONTRAINT_FILE, fname)
+    try:
+        f = open(constraint_file)
+    except FileNotFoundError:
+        print("constraint file {} not found".format(constraint_file))
+        return dict()
+    
+    return json.load(f)
+    
 
 def get_possible_values(source_value, target_value):
     """

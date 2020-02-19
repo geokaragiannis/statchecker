@@ -75,6 +75,7 @@ class ClassificationStep:
 
         self.train_df = train_df
         self.val_df = val_df
+        self.parser.set_task_values(self.train_df)
         print("training on {} number of samples".format(len(self.train_df)))
 
         featurizer_tf, featurizer_emb =  self.get_featurizers()
@@ -83,6 +84,7 @@ class ClassificationStep:
         X_train = self.get_feature_union(sents_train, claims_train, self.tok_driver, 
                                              featurizer_emb, featurizer_tf, mode="train")
         if val_df is not None:
+            self.parser.set_task_values(self.val_df)
             print("validating on {} number of samples".format(len(self.val_df)))
             sents_val = list(self.val_df["sent"])
             claims_val = list(self.val_df["claim"])
@@ -118,6 +120,7 @@ class ClassificationStep:
 
     def train(self, df, train_frac=0.9):
         self.complete_df = df
+        self.parser.set_task_values(self.complete_df)
         
         if self.simulation:
             self.test_df = self.get_test_df_simulation(test_frac=0.05)
@@ -255,6 +258,11 @@ class ClassificationStep:
         self.test_df = helpers.load_df_from_dir(self.config["data_dir"], self.config["test_df_name"])
         self.train_df = helpers.load_df_from_dir(self.config["data_dir"], self.config["train_df_name"])
         self.val_df = helpers.load_df_from_dir(self.config["data_dir"], self.config["val_df_name"])
+        self.parser.set_task_values(self.train_df)
+        if self.test_df is not None:
+            self.parser.set_task_values(self.test_df)
+        if self.val_df is not None:
+            self.parser.set_task_values(self.val_df)
         print("loaded train_df, val_df and test_df successfully")
         return self.train_df, self.val_df, self.test_df
 

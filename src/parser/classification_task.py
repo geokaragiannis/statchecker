@@ -8,7 +8,7 @@ from src import helpers
 
 
 class ClassificationTask:
-    def __init__(self, init_name, name, hash_name, label_task, priority, val_acc=0.0):
+    def __init__(self, init_name, name, hash_name, label_task, priority, ver_cost, der_cost, val_acc=0.0):
         """
         Arguments:
             init_name {str} -- [name that appears in the original csv files]
@@ -17,6 +17,8 @@ class ClassificationTask:
                                classification task]
             label_task {str} -- [Classification type. Either "single-label" or "multi-label"]
             priority {int} -- {a lower number is a more important task}
+            ver_cost {int} -- {verification cost}
+            der_cost {int} -- {derivation cost}
             val_acc {float} -- [accuracy in the validation set]
         """
         self.init_name = init_name
@@ -24,6 +26,9 @@ class ClassificationTask:
         self.hash_name = hash_name
         self.label_task = label_task
         self.priority = priority
+        self.ver_cost = ver_cost
+        self.der_cost = der_cost
+        self.topn = None
         self.val_acc = val_acc
         # True if we have hashed the values of the Classification Task
         self.has_hash = True
@@ -31,6 +36,8 @@ class ClassificationTask:
             self.has_hash = False
         
         self.config = helpers.load_yaml("src/config.yml")
+
+        self.all_values = set()
 
         self.classifier_name = self.name + "_classifier"
         self.featurizer_tf_name = self.name + "_featurizer_tf"
@@ -48,6 +55,17 @@ class ClassificationTask:
         self.label_to_hash_dict_name = self.name + "_label_to_hash_dict.json"
         # hash_counter will always be incremented when we add a new label to a task's hash_dict
         self.hash_counter = 0
+
+    def populate_all_values(self, df_column_list):
+        """
+        Go through the values of the list of values and add them to the set of all possible
+        values. Note, because some tasks have values joined by "-" ("2013-2017-2011")
+        we split by "-" and add to the set
+        Arguments:
+            df_column_list {list} -- [list of strings]
+        """
+        for val in df_column_list:
+            self.all_values.update(val.split("-"))
 
     
     def hash_(self, label):

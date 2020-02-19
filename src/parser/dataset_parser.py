@@ -34,7 +34,8 @@ class DatasetParser:
         for task_name, task_value in self.config["classification_tasks"].items():
             task_obj = ClassificationTask(task_value["init_name"], task_value["name"], 
                                           task_value["hash_name"], task_value["label_task"],
-                                          task_value["priority"])
+                                          task_value["priority"], task_value["verification_cost"],
+                                          task_value["derivation_cost"])
             task_dict[task_name] = task_obj
         return task_dict
 
@@ -190,6 +191,15 @@ class DatasetParser:
                 continue
             ret_df = self.add_item_column_to_df(ret_df, task_obj)
         return ret_df 
+
+    def set_task_values(self, df):
+        """
+        Sets all the possible values a task can take
+        Arguments:
+            df {[type]} -- [description]
+        """
+        for task_name, task in self.classification_tasks_dict.items():
+            task.populate_all_values(list(df[task_name])) 
 
     def create_cv_dataset(self, df, label_column, min_samples):
         """
