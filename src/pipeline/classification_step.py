@@ -118,6 +118,43 @@ class ClassificationStep:
             helpers.save_df_to_dir(self.config["data_dir"], self.config["train_df_name"], self.train_df)
             helpers.save_df_to_dir(self.config["data_dir"], self.config["val_df_name"], self.val_df)
 
+    def train_for_user_study(self, df):
+        """
+        Only use a single training dataframe. No validation is done here.
+        
+        Arguments:
+            df {[type]} -- [description]
+        """
+        self.train_df = df
+        # each task has now all the possible values it can take
+        self.parser.set_task_values(self.train_df)
+
+        featurizer_tf, featurizer_emb =  self.get_featurizers()
+        sents_train = list(self.train_df["sent"])
+        claims_train = list(self.train_df["claim"])
+        X_train = self.get_feature_union(sents_train, claims_train, self.tok_driver, 
+                                             featurizer_emb, featurizer_tf, mode="train")
+        self.set_featurizers(featurizer_tf, featurizer_emb)
+
+        for _, task in self.classification_tasks_dict.items():
+            print("Training classifier for task: {}".format(task.name))
+            
+            y_train = list(self.train_df[task.hash_name])
+            task_classifier = self.train_single_task(X_train, y_train, task)
+            task.featurizer_tf = featurizer_tf
+            task.featurizer_emb = featurizer_emb
+            task.classifier = task_classifier
+            task.is_trained = True
+            if self.export:
+                task_classifier.export()
+                task.export_hash_dicts()
+
+        if self.export:
+            featurizer_tf.export()
+            featurizer_emb.export()
+            # export train_df to disk
+            helpers.save_df_to_dir(self.config["data_dir"], self.config["train_df_name"], self.train_df)
+
     def train(self, df, train_frac=0.9):
         self.complete_df = df
         self.parser.set_task_values(self.complete_df)
@@ -244,6 +281,7 @@ class ClassificationStep:
         common_featurizer_tf.load()
         common_featurizer_emb = FeatureExtractor(mode="word-embeddings")
         common_featurizer_emb.load()
+        self.set_featurizers(common_featurizer_tf, common_featurizer_emb)
         for _, task in self.classification_tasks_dict.items():
             task_classifier = ClassifierLinearSVM(task)
             task_classifier.load()

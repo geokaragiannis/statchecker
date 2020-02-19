@@ -89,27 +89,31 @@ def get_preds_from_df(df, class_pipeline):
         df[task.name] = task_pred_lists
     return df
 
-class_step = ClassificationStep(DATA_PATH, simulation=False, export=False)
-opt_step = OptimizationStep(class_step)
+class_step = ClassificationStep(DATA_PATH, simulation=False, export=True)
 user_study_file = "data/user_study_40_claims.csv"
 user_study_df = pd.read_csv(user_study_file)
 
-complete_df = class_step.parser.get_complete_df()[:200]
+complete_df = class_step.parser.get_complete_df()
 
 # remove the claims selected for the user study
 complete_df = user_study_df.merge(complete_df, how = 'outer', indicator=True).loc[lambda x : x['_merge']=='right_only']
 complete_df.drop(columns=["_merge"], inplace=True)
-class_step.train(complete_df)
+# train
+# class_step.train_for_user_study(complete_df)
+# load
+class_step.load_models()
+train_df, _, _ = class_step.load_dfs()
+opt_step = OptimizationStep(class_step)
+print(len(complete_df) == len(train_df))
 claims = create_claims_from_df(user_study_df, class_step)
 for claim in claims:
     opt_step.optimize_claim(claim)
-    print(claim.sent)
-    for prop in claim.available_properties:
-        print("prop name: ", prop.property_name)
-        print("property ask: ", prop.ask)
-        for val in prop.candidate_values:
-            print("val: {} prob: {}".format(val.value, val.prob))
-    break
+    # print(claim.sent)
+    # for prop in claim.available_properties:
+        # print("prop name: ", prop.property_name)
+        # print("property ask: ", prop.ask)
+        # for val in prop.candidate_values:
+            # print("val: {} prob: {}".format(val.value, val.prob))
 
 # preds_df = get_preds_from_df(user_study_df, class_step)
 # print(preds_df.head())

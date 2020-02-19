@@ -22,13 +22,7 @@ class OptimizationStep:
     def __init__(self, classification_step):
         self.classification_step = classification_step
         self.max_num_prop = None
-        self.all_formula_var_instances_dict = {"file": Counter(), "row_index": Counter(), "column": Counter()}
-        self.get_all_instances_of_var()
-        if classification_step.train_df is not None:
-            classification_step.parser.set_task_values(classification_step.train_df)
-        else:
-            complete_df = classification_step.parser.get_complete_df()
-            classification_step.parser.set_task_values(complete_df)
+        self.init_number_formulas = self.get_init_number_formulas()
 
     def optimize_claim(self, claim):
 
@@ -88,70 +82,116 @@ class OptimizationStep:
         Arguments:
             claim {Claim obj} -- [The claim for which we wish to know the prperties to ask]
         """
-        all_formulas_dict = self.all_formula_var_instances_dict
+        number_remaining_formulas = self.init_number_formulas
         idx = 0
-        for prop in claim.available_properties:
-            if prop.property_name == "template_formula":
-                continue
-            idx += 1
-            if idx == num_properties_questions:
-                break
-            max_prunning_factor = np.inf
-            if not prop.ask:
-                top_pred_value = prop.candidate_values[0]
-                prunning_factor = self.get_number_formulas_excluded_per_var(all_formulas_dict, top_pred_value.value, prop.property_name)
-                if prunning_factor < max_prunning_factor:
-                    max_prunning_factor = prunning_factor
+        # print("statring props to ask")
+        # print("num properties questions: ", num_properties_questions)
+        if num_properties_questions > len(claim.available_properties) - 1:
+            # ask about all claims (minus the template formula)
+            num_to_ask = len(claim.available_properties) - 1
+        else:
+            num_to_ask = num_properties_questions
+
+        # print("num to ask: ", num_to_ask)
+        for i in range(num_to_ask):
+            max_factor_property = None
+            max_prunning_factor = 0
+            for prop in claim.available_properties:
+                if prop.property_name == "template_formula":
                     prop.ask = True
+                    continue
+                idx += 1
+                if not prop.ask:
+                    prop.ask = True
+                    prunning_factor = self.get_number_formulas_excluded_per_var(number_remaining_formulas, claim)
+                    # print("property: {}, prunning factor: {}".format(prop.property_name, prunning_factor))
+                    prop.ask = False
+                    if prunning_factor > max_prunning_factor:
+                        max_prunning_factor = prunning_factor
+                        max_factor_property = prop
+
+            max_factor_property.ask = True
+            number_remaining_formulas = number_remaining_formulas - max_prunning_factor
+            print("step: {}, max_factor_prop: {}, remaining formulas: {}".format(i, max_factor_property.property_name, number_remaining_formulas))
 
 
 
-    def get_number_formulas_excluded_per_var(self, all_formulas, property_value, property_name):
+    def get_number_formulas_excluded_per_var(self, number_remaining_formulas, claim):
         """
         Return the number of formulas a specific value for a property (i.e TPEDTOTAL)
         excludes per variable. I.e the number of formulas that does not have as row_index TPEDTOTAL
         Arguments:
-            all_formulas {dict of Counters} -- [contains the number of times each property value occurs]
+            number_remaining_formulas {int} -- [contains the number of times each property value occurs]
             property_value {str} -- [TPEDTOTAL or file1 or ...]
             property_name {str} -- [row_index or file or column]
         """
-        num_occurences = all_formulas[property_name][property_value]
-        total_num_formulas = 0
-        for _, counter_dict in all_formulas.items():
-            total_num_formulas += sum(counter_dict.values())
+
+        return number_remaining_formulas - self.get_remaining_number_formulas(claim)
+
+
+
+    def get_remaining_number_formulas(self, claim):
+        """
+        Get the remaining number of total formulas per variable after picking
+        some properties already
         
-        return total_num_formulas - num_occurences
-
-    
-    # def update_all_instances_of_var(self, property_answered):
-    #     # if property_answered == "file":
-    #     #     # get rows from constraint dict
-    #     remaining_properties = set(["file", "row_index", "column"]) - set(property_answered)
-
-
-    def get_all_instances_of_var(self):
+        Arguments:
+            properties_picked {list of str} -- [description]
         """
-        Return a a counter dict, which contains how many times a sprcific value of a property
-        occurs in all the possible instances of a variable. E.g we return a dict which looks like:
-        {"TPEDTOTAL": 100, "file2": 10221, "2012": 10, ...}
-        Here we only use file, row_index and column.
+
+        remaining_properties = []
+        file_asked = True
+        row_not_asked = False
+        file_top_pred = None
+        for prop in claim.available_properties:
+            if prop.property_name == "template_formula":
+                continue
+            if prop.property_name == "file":
+                file_top_pred = prop.candidate_values[0].value
+            if not prop.ask:
+                remaining_properties.append(prop)
+                if prop.property_name == "row_index":
+                    row_not_asked = True
+                if prop.property_name == "file":
+                    file_asked = False
+
+        # if we have selected a file and not a row_idx use the contraints
+        use_constraints = file_asked and row_not_asked
+
+        # print("remaining properties: ", [prop.property_name for prop in remaining_properties])
+
+
+        remaining_num = 1
+        for rem_prop in remaining_properties:
+            if use_constraints and rem_prop.property_name == "row_index":
+                # get number of possible rows from constraint dict. If it fails consider all the rows
+                try:
+                    file_to_row_constraint_dict = helpers.load_contraint_file("file2row_index.json")
+                    num_all_values = file_to_row_constraint_dict.get[file_top_pred]
+                except:
+                    num_all_values = len(self.classification_step.classification_tasks_dict[rem_prop.property_name].all_values)
+            else:
+                num_all_values = len(self.classification_step.classification_tasks_dict[rem_prop.property_name].all_values)
+            remaining_num *= num_all_values 
+
+        return remaining_num
+
+
+    def get_init_number_formulas(self):
         """
-        # TODO: fix the file2row_index constraint to have the same keys as the data we train on
-        # sets of all the properties we consider
+        Get the inital number of all template formulas for one variable
+        """
+        # no contraints
         all_files = self.classification_step.classification_tasks_dict["file"].all_values
         all_row_indexes = self.classification_step.classification_tasks_dict["row_index"].all_values
         all_columns = self.classification_step.classification_tasks_dict["column"].all_values
-        # file_to_row_constraint_dict = helpers.load_contraint_file("file2row_index.json")
-        # print("aaa \n\n\n\n\n\n", file_to_row_constraint_dict.keys())
-       
+        file_to_row_constraint_dict = helpers.load_contraint_file("file2row_index.json")
+        # print("sizes of files: {}, row: {}, col: {} ".format(len(all_files), len(all_row_indexes), len(all_columns)) )
+        # get all rows available from the constraint
+        all_files_rows = 0
         for file in all_files:
-            for row in all_row_indexes:
-                for column in all_columns:
-                    # d = {"file": file, "row_index": row, "column": column}
-                    # all_formula_var_instances.append(d)
-                    self.all_formula_var_instances_dict["file"][file] += 1
-                    self.all_formula_var_instances_dict["row_index"][row] += 1
-                    self.all_formula_var_instances_dict["column"][column] += 1
+            num_rows_from_file = len(file_to_row_constraint_dict.get(file, all_row_indexes))
+            all_files_rows += num_rows_from_file
 
-        return self.all_formula_var_instances_dict
+        return all_files_rows * len(all_columns)
 

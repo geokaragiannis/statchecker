@@ -11,3 +11,5 @@ class Property:
         self.task = task
         # a single Value object that constitutes the correct value
         self.ground_truth = None
+        # True if the property will be included in the crowdsourcing questions
+        self.ask = False

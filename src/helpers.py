@@ -40,7 +40,7 @@ def load_model_from_dir(dir, fname):
     return pickle.load(f)
 
 def save_df_to_dir(dir, fname, df):
-    if not df:
+    if df is None:
         return
     safe_mkdir(dir)
     fpath = os.path.join(dir, fname)
@@ -48,7 +48,10 @@ def save_df_to_dir(dir, fname, df):
 
 def load_df_from_dir(dir, fname):
     fpath = os.path.join(dir, fname)
-    return pd.read_csv(fpath)
+    try:
+        return pd.read_csv(fpath)
+    except FileNotFoundError:
+        return None
 
 def set_up_logging():
     default_config = "logging.yml"
