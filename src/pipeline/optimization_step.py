@@ -34,6 +34,25 @@ class OptimizationStep:
         else:
             num_properties_questions = len(claim.available_properties)
         self.get_subset_props_to_ask(claim, num_properties_questions)
+
+    
+    def optimize_claim_only_verification(self, claim):
+        """
+        This method will only be used in simulations. Here we set the top_n predictions 
+        for each property to be all the labels we have in the training data. This way, 
+        the outputs of the classifier, will be the maximum possible, which will result in 
+        only having verifications and not a single derivation.
+        
+        Arguments:
+            claim {Claim obj} -- [description]
+        """
+
+        for task in self.classification_step.classification_tasks_dict.values():
+            task.topn = len(task.all_values)
+        # ask about all claims
+        num_properties_questions = len(claim.available_properties)
+        self.get_preds_from_claim(claim)
+        self.get_subset_props_to_ask(claim, num_properties_questions)
         
 
     def get_preds_from_claim(self, claim):
@@ -112,7 +131,7 @@ class OptimizationStep:
 
             max_factor_property.ask = True
             number_remaining_formulas = number_remaining_formulas - max_prunning_factor
-            print("step: {}, max_factor_prop: {}, remaining formulas: {}".format(i, max_factor_property.property_name, number_remaining_formulas))
+            # print("step: {}, max_factor_prop: {}, remaining formulas: {}".format(i, max_factor_property.property_name, number_remaining_formulas))
 
 
 
