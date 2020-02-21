@@ -9,7 +9,9 @@ class Property:
         self.candidate_values = candidate_values
         # ClassificationTask object
         self.task = task
-        # a single Value object that constitutes the correct value
+        # a single string that constitutes the correct value
         self.ground_truth = None
+        # -1 if the property was derived. Otherwise keep track of the verification position
+        self.verified_index = None
         # True if the property will be included in the crowdsourcing questions
         self.ask = False

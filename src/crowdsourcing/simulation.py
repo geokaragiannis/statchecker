@@ -1,4 +1,5 @@
 from src.pipeline.classification_step import ClassificationStep
+from src.pipeline.optimization_step import OptimizationStep
 from src.parser.classification_task import ClassificationTask
 from src.crowdsourcing.claim import Claim
 from src.crowdsourcing.property import Property
@@ -8,11 +9,12 @@ from colorama import Fore, Style
 
 DATA_PATH = "data/claims_01-23-2020/"
 class Simulation:
-    def __init__(self, data_path):
-        self.classification_pipeline = ClassificationStep(data_path, simulation=True, min_samples=1)
+    def __init__(self, class_pipeline, opt_pipeline):
+        self.classification_pipeline = class_pipeline
+        self.optimization_pipeline = opt_pipeline
         self.z = 0
 
-    def create_claims_from_df(self, test_df):
+    def create_claims_from_df(self, test_df, get_preds=False, get_ground_truth=False):
         """
         return a list of Claim objects by populating them with the sentence and claim strings
         from the test_df. 
@@ -22,8 +24,12 @@ class Simulation:
             available_properties = [Property(t.name, task=t) for t in 
                                     list(self.classification_pipeline.classification_tasks_dict.values())]
             available_properties = sorted(available_properties, key=lambda x: x.task.priority)
+            if get_ground_truth:
+                for prop in available_properties: 
+                    prop.ground_truth = test_row[prop.property_name]
             test_claim = Claim(test_row["sent"], test_row["claim"], available_properties)
-            self.get_preds_from_claim(test_claim)
+            if get_preds:
+                self.get_preds_from_claim(test_claim)
             test_claims.append(test_claim)
         return test_claims
 
@@ -71,6 +77,55 @@ class Simulation:
                 print(">> You made a mistake")
         print("\n\n")
 
+    def get_cost_of_claim_from_preds(self, claim):
+        cost = 0
+        for prop in claim.available_properties:
+            # find index of ground_truth in the preds. If not found, count it as a derivation cost
+            cand_values_str = [v.value for v in prop.candidate_values]
+            
+            try:
+                idx = cand_values_str.index(prop.ground_truth)
+                cost += (idx+1)*prop.task.ver_cost
+                prop.verified_index = idx
+            except ValueError:
+                # derivation
+                # print("prop: {}, preds: {}".format(prop.property_name, cand_values_str))
+                # print("ground_truth: ", prop.ground_truth)
+                cost += len(cand_values_str)*prop.task.ver_cost + prop.task.der_cost
+                prop.verified_index = -1
+        return cost
+
+    def get_cost_random_order_opt(self, test_df):
+        """
+        Assuming that we have a trained model, go through the test claims, get the predictions
+        and calculate the actual cost. We use the optimization to get the number of predictions
+        and the subset of properties we ask about.
+        Arguments:
+            test_df {DataFrame} -- [claims to be verified]
+        """
+        # claims without preds with the groundtruth
+        claims = self.create_claims_from_df(test_df, get_ground_truth=True)
+        total_cost = 0
+        for claim in claims:
+            self.optimization_pipeline.optimize_claim(claim)
+            total_cost += self.get_cost_of_claim_from_preds(claim)
+        return total_cost, claims
+
+    def get_cost_random_order_only_verification(self, test_df):
+        """
+        Assuming that we have a trained model, go through the test claims, get the predictions
+        and calculate the actual cost. We only ask for a verification. never a derivation
+        Arguments:
+            test_df {DataFrame} -- [claims to be verified]
+        """
+        # claims without preds with the groundtruth
+        claims = self.create_claims_from_df(test_df, get_ground_truth=True)
+        total_cost = 0
+        for claim in claims:
+            self.optimization_pipeline.optimize_claim_only_verification(claim)
+            total_cost += self.get_cost_of_claim_from_preds(claim)
+        return total_cost, claims
+
 
     def run(self):
 
@@ -100,6 +155,8 @@ class Simulation:
                 claims_to_retrain = []
 
 if __name__ == "__main__":
-    simulation = Simulation(DATA_PATH)
+    class_pipeline = ClassificationStep(DATA_PATH, simulation=True, min_samples=1)
+    opt_pipeline = OptimizationStep(class_pipeline)
+    simulation = Simulation(class_pipeline, opt_pipeline)
     simulation.run()
 
