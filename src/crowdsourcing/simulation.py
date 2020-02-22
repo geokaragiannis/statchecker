@@ -5,6 +5,7 @@ from src.crowdsourcing.claim import Claim
 from src.crowdsourcing.property import Property
 from src.crowdsourcing.value import Value
 from colorama import Fore, Style
+import math
 
 
 DATA_PATH = "data/claims_01-23-2020/"
@@ -77,6 +78,19 @@ class Simulation:
                 print(">> You made a mistake")
         print("\n\n")
 
+    def print_preds(self, claim):
+        for prop in claim.available_properties:
+            if prop.verified_index == -1:               
+                print("------Derived-----")
+            else:
+                print("-----Verified: {} -------".format(prop.verified_index))
+            print("Ground Truth: ", prop.ground_truth)
+            print("Prop Name: {}".format(prop.property_name))
+            print("preds: ")
+            for val in prop.candidate_values:
+                print("\t Value: {}, Prob: {}".format(val.value, val.prob))
+            print("Entropy: ", prop.entropy)
+
     def get_cost_of_claim_from_preds(self, claim):
         cost = 0
         for prop in claim.available_properties:
@@ -93,6 +107,7 @@ class Simulation:
                 # print("ground_truth: ", prop.ground_truth)
                 cost += len(cand_values_str)*prop.task.ver_cost + prop.task.der_cost
                 prop.verified_index = -1
+        # self.print_preds(claim)
         return cost
 
     def get_cost_random_order_opt(self, test_df):
