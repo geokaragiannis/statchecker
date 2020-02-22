@@ -26,9 +26,11 @@ class OptimizationStep:
 
     def optimize_claim(self, claim):
 
-        self.get_topn(claim)
+        self.set_topn(claim)
         max_properties_questions = self.get_max_num_properties_to_ask(lamda=4)
         self.get_preds_from_claim(claim)
+        # use the preds and re-calculate topn and clip (if necessary) the extra preds
+        self.set_topn_entropy_and_clip_preds(claim)
         if max_properties_questions < len(claim.available_properties):
             num_properties_questions = max_properties_questions 
         else:
@@ -73,13 +75,27 @@ class OptimizationStep:
                 except: 
                     values_list = [Value(label, prob, prop) for label, prob in zip(pred_labels, pred_probs)]
             prop.candidate_values = values_list
+            prop.set_entropy()
 
-    def get_topn(self, claim):
+    def set_topn(self, claim):
         """
         For each property, compute the number of options to display
         """
         for task in self.classification_step.classification_tasks_dict.values():
             task.topn = math.floor(task.der_cost/task.ver_cost)
+    
+    def set_topn_entropy_and_clip_preds(self, claim):
+        """
+        For each property modify the previosuly calculated topn for the task by incorporating the 
+        entropy of the predictions. The higher the entropy the more uncertain we are.
+        After computing the new topn using the entropy of preds, we potentially clip the number of predictions
+        per property. Example, if the number of predictions was initially 5 and after the predictions topn=2, 
+        we need to only keep the first two predictions
+        """
+        for prop in claim.available_properties:
+            prop.topn = math.floor(prop.task.topn * prop.entropy)
+            # only keep the new topn number of preds
+            prop.candidate_values = prop.candidate_values[:prop.topn]
     
     def get_max_num_properties_to_ask(self, lamda=4):
         """
@@ -165,7 +181,7 @@ class OptimizationStep:
         for prop in claim.available_properties:
             if prop.property_name == "template_formula":
                 continue
-            if prop.property_name == "file":
+            if prop.property_name == "file" and len(prop.candidate_values) > 0:
                 file_top_pred = prop.candidate_values[0].value
             if not prop.ask:
                 remaining_properties.append(prop)
