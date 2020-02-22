@@ -56,7 +56,8 @@ class ClassifierLinearSVM:
         sorted_conf_idx = np.argsort(raw_confidences)[::-1][:n]
         labels = np.take(self.calibrated_model.classes_, sorted_conf_idx)
         confidences = np.take(raw_confidences, sorted_conf_idx)
-        scaled_confidences = self._linear_scale_confidence(confidences)
+        # scaled_confidences = self._linear_scale_confidence(confidences)
+        scaled_confidences = confidences
 
         return labels, scaled_confidences
 
