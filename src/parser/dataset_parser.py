@@ -44,11 +44,11 @@ class DatasetParser:
         df = pd.DataFrame()
         for file in csv_files:
             chapter_df = pd.read_csv(file)
-            chapter_df["file"] = file
+            chapter_df["chapter"] = file.split("/")[-1].split(".")[0]
             df = pd.concat([df, chapter_df], sort=False)
         # rename the dataframe
         df = df.rename(columns={"Text": "sent", "Claim": "claim", "Calculation Equation": "formula",
-                                "LOOKUP and FORMULA Dictionaries": "dicts", "Annotation Tab": "tab", 
+                                "LOOKUP and FORMULA Dictionaries": "dicts", "Annotation Tab": "section", 
                                 "Calculation Value": "calculation_value"})
         return df
 
@@ -183,6 +183,9 @@ class DatasetParser:
         tab_df = self.add_item_column_to_df(tab_df, task)
         return tab_df
 
+    def apply_subsection(self, row):
+        return "-".join([row["chapter"], str(row["section"])])
+
     def get_complete_df(self):
         # start with the formula_df and keep adding new items (row_idx, columns, ...)
         ret_df = self.get_formula_df()
@@ -190,6 +193,8 @@ class DatasetParser:
             if task == "template_formula":
                 continue
             ret_df = self.add_item_column_to_df(ret_df, task_obj)
+        # add the subsection (i.e Ch2_intro)
+        ret_df["subsection"] = ret_df.apply(self.apply_subsection, axis=1)
         return ret_df 
 
     def set_task_values(self, df):

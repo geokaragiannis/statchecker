@@ -3,9 +3,10 @@ import numpy as np
 
 
 class Claim:
-    def __init__(self, sent, claim, available_properties, ver_cost=1, der_cost=5):
+    def __init__(self, sent, claim, subsection, available_properties, ver_cost=1, der_cost=5):
         self.sent = sent
         self.claim = claim
+        self.subsection = subsection
         self.expected_cost = 0.0
         self.real_cost = 0.0
         # list of Property objects, which are relevant for this claim
