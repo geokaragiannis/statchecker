@@ -24,18 +24,18 @@ class OptimizationStep:
         self.max_num_prop = None
         self.init_number_formulas = self.get_init_number_formulas()
 
-    def optimize_claim(self, claim):
+    def optimize_claim(self, claim, features):
 
         self.set_topn(claim)
         max_properties_questions = self.get_max_num_properties_to_ask(lamda=4)
-        self.get_preds_from_claim(claim)
+        self.get_preds_from_claim(claim, features)
         # use the preds and re-calculate topn and clip (if necessary) the extra preds
         self.set_topn_entropy_and_clip_preds(claim)
         if max_properties_questions < len(claim.available_properties):
             num_properties_questions = max_properties_questions 
         else:
             num_properties_questions = len(claim.available_properties)
-        self.get_subset_props_to_ask(claim, num_properties_questions)
+        # self.get_subset_props_to_ask(claim, num_properties_questions)
 
     
     def optimize_claim_only_verification(self, claim):
@@ -57,25 +57,23 @@ class OptimizationStep:
         self.get_subset_props_to_ask(claim, num_properties_questions)
         
 
-    def get_preds_from_claim(self, claim):
+    def get_preds_from_claim(self, claim, features):
 
         for prop in claim.available_properties:
-            featurizer_tf = prop.task.featurizer_tf
-            featurizer_emb = prop.task.featurizer_emb
             classifier = prop.task.classifier
-            features = self.classification_step.get_feature_union([claim.sent], [claim.claim], self.classification_step.tok_driver, 
-                                                           featurizer_emb, featurizer_tf, mode="test")
             pred_labels, pred_probs = classifier.predict_utt_top_n(features, n=prop.task.topn)
             if prop.property_name == "template_formula":
                 values_list = [Value(label, prob, prop) for label, prob in zip(pred_labels, pred_probs)]
             else:
                 hash_to_label_dict = prop.task.hash_to_label_dict
-                try:
-                    values_list = [Value(hash_to_label_dict[str(int(label))], prob, prop) for label, prob in zip(pred_labels, pred_probs)]
-                except: 
-                    values_list = [Value(label, prob, prop) for label, prob in zip(pred_labels, pred_probs)]
+                # try:
+                values_list = [Value(hash_to_label_dict[str(int(label))], prob, prop) for label, prob in zip(pred_labels, pred_probs)]
+                # except: 
+                #     values_list = [Value(label, prob, prop) for label, prob in zip(pred_labels, pred_probs)]
             prop.candidate_values = values_list
             prop.set_entropy()
+        claim.set_uncertainty()
+        claim.set_expected_cost()
 
     def set_topn(self, claim):
         """
@@ -93,7 +91,8 @@ class OptimizationStep:
         we need to only keep the first two predictions
         """
         for prop in claim.available_properties:
-            prop.topn = math.floor(prop.task.topn * prop.entropy)
+            # prop.topn = math.ceil(prop.task.topn * (1 - prop.entropy))
+            prop.topn = 10
             # only keep the new topn number of preds
             prop.candidate_values = prop.candidate_values[:prop.topn]
     
@@ -118,6 +117,7 @@ class OptimizationStep:
             claim {Claim obj} -- [The claim for which we wish to know the prperties to ask]
         """
         number_remaining_formulas = self.init_number_formulas
+        # print("init number of formulas: ", number_remaining_formulas)
         idx = 0
         # print("statring props to ask")
         # print("num properties questions: ", num_properties_questions)
@@ -175,7 +175,7 @@ class OptimizationStep:
         """
 
         remaining_properties = []
-        file_asked = True
+        file_asked = False
         row_not_asked = False
         file_top_pred = None
         for prop in claim.available_properties:
@@ -183,6 +183,7 @@ class OptimizationStep:
                 continue
             if prop.property_name == "file" and len(prop.candidate_values) > 0:
                 file_top_pred = prop.candidate_values[0].value
+                file_asked = True
             if not prop.ask:
                 remaining_properties.append(prop)
                 if prop.property_name == "row_index":
