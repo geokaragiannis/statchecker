@@ -45,6 +45,7 @@ class DatasetParser:
         for file in csv_files:
             chapter_df = pd.read_csv(file)
             chapter_df["chapter"] = file.split("/")[-1].split(".")[0]
+            chapter_df.dropna(subset=['Text', 'Claim'], inplace=True)
             df = pd.concat([df, chapter_df], sort=False)
         # rename the dataframe
         df = df.rename(columns={"Text": "sent", "Claim": "claim", "Calculation Equation": "formula",
@@ -61,8 +62,8 @@ class DatasetParser:
             return False
         elif len(re.findall(self.regex_obj.formula_regex, str(row["claim"]))) > 0:
             return False
-        elif len(re.findall(self.regex_obj.other_file_ref_regex, str(row["formula"]))) > 0:
-            return False
+        # elif len(re.findall(self.regex_obj.other_file_ref_regex, str(row["formula"]))) > 0:
+        #     return False
         else:
             return True
 
@@ -124,9 +125,9 @@ class DatasetParser:
             item_value = cell_dict.get(item)
             if isinstance(item_value, list):
                 for w in item_value:
-                    ret_set.add(str(w))
+                    ret_set.add(str(w).lower())
             elif item_value:
-                ret_set.add(str(item_value))
+                ret_set.add(str(item_value).lower())
         return "-".join(sorted(ret_set)) if len(ret_set) > 0 else None
     
     def apply_hash(self, row, task):
