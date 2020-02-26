@@ -72,6 +72,26 @@ class TemplateTransformer:
     def remove_white_space(s):
         return s.replace(" ", "")
 
+    @staticmethod
+    def remove_leading_ops(s):
+        if s[0] == "+" or s[0] == "-" or s[0] == "*" or s[0] == "/":
+            return s[1:]
+        else:
+            return s
+
+    @staticmethod
+    def remove_excess(s):
+        if s[0] == "+" or s[0] == "-" or s[0] == "*" or s[0] == "/":
+            return s[1:]
+        else:
+            return s
+
+    def remove_file_reference(self, s):
+        matches = re.findall(self.regex_obj.other_file_ref_regex, s)
+        for match in matches:
+            s = s.replace(match,"")
+        return s
+
     def create_template_formulas(self, row):
         """
         applied to each row, returning the template for each formula, by substituting vars for cell references and
@@ -90,6 +110,8 @@ class TemplateTransformer:
         template_formula = self.replace_variables_in_formula(template_formula, ref_vars_dict)
         template_formula = self.replace_str_in_formula(template_formula, string_references)
         template_formula = self.remove_white_space(template_formula)
+        template_formula = self.remove_leading_ops(template_formula)
+        template_formula = self.remove_file_reference(template_formula)
         return template_formula
 
     def transform_formula_df(self):
