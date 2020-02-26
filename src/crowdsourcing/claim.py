@@ -13,6 +13,33 @@ class Claim:
         self.available_properties = available_properties
         self.verification_cost = ver_cost
         self.derivation_cost = der_cost
+        self.uncertainty = None
+
+
+    def set_uncertainty(self):
+        """
+        Sets the uncertainty of the claim, according to the preds from the classifiers.
+        Define uncertainty as the average of preds across tasks
+        """
+        u = 0.0
+        for prop in self.available_properties:
+            u += np.sum([v.prob for v in prop.candidate_values])/len(prop.candidate_values)
+        self.uncertainty = 1 - u/len(self.available_properties)
+
+    def set_expected_cost(self):
+        """
+        the expected cost per propery is calculated as:
+        \sum_{i=1}^{num_preds} p_i * Ver_cost_i * \prod_{j=1}^{i} (1-p_j) + \prod_{i=1}^{num_preds} (1-p_i) Der_cost_i
+        """
+        cost = 0.0
+        for prop in self.available_properties:
+            ver_cost = prop.task.ver_cost
+            cand_values_prob = np.array([v.prob for v in prop.candidate_values])
+            cost += np.sum([p*ver_cost*np.prod(1 - cand_values_prob[:i]) 
+                        for i,p in enumerate(cand_values_prob)])
+            cost += np.prod(1 - cand_values_prob)*prop.task.der_cost
+        self.expected_cost = cost
+
 
     def convert_to_pandas_row(self):
         """
@@ -22,6 +49,7 @@ class Claim:
         row_dict = dict()
         row_dict["sent"] = self.sent
         row_dict["claim"] = self.claim
+        row_dict["subsection"] = self.subsection
         for prop in self.available_properties:
             row_dict[prop.task.name] = prop.ground_truth
             if prop.task.has_hash:

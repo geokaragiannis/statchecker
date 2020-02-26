@@ -1,5 +1,5 @@
 import math
-
+from scipy.stats import entropy
 class Property:
     def __init__(self, property_name, confidence=1.0, candidate_values=[], claim=None, task=None):
         # file, tab, row_index, ...
@@ -22,6 +22,7 @@ class Property:
         self.ask = False
 
     def set_entropy(self):
-        ent = -sum([v.prob * math.log(v.prob) for v in self.candidate_values])
+        probs = [v.prob for v in self.candidate_values]
+        ent = entropy(probs, base=10)
         # making sure maximum entropy we get is 1 (which is the case unless we have arithmetic miscalc.)
         self.entropy = min(1, ent)
