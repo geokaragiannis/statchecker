@@ -21,7 +21,6 @@ class ClassificationStep:
         self.parser = DatasetParser(self.data_path)
         # dict of classification_tasks to be included in the classification.
         self.classification_tasks_dict = self.parser.classification_tasks_dict
-        self.tok_driver = TokenizerDriver()
         # common featurizer objects for all tasks
         self.featurizer_tf = None
         self.featurizer_emb = None
@@ -81,14 +80,14 @@ class ClassificationStep:
         featurizer_tf, featurizer_emb =  self.get_featurizers()
         sents_train = list(self.train_df["sent"])
         claims_train = list(self.train_df["claim"])
-        X_train = self.get_feature_union(sents_train, claims_train, self.tok_driver, 
+        X_train = self.get_feature_union(sents_train, claims_train,
                                              featurizer_emb, featurizer_tf, mode="train")
         if val_df is not None:
             self.parser.set_task_values(self.val_df)
             print("validating on {} number of samples".format(len(self.val_df)))
             sents_val = list(self.val_df["sent"])
             claims_val = list(self.val_df["claim"])
-            X_val = self.get_feature_union(sents_val, claims_val, self.tok_driver, featurizer_emb,
+            X_val = self.get_feature_union(sents_val, claims_val, featurizer_emb,
                                             featurizer_tf, mode="test")
         
         self.set_featurizers(featurizer_tf, featurizer_emb)
@@ -129,13 +128,14 @@ class ClassificationStep:
         # each task has now all the possible values it can take
         self.parser.set_task_values(self.train_df)
 
-        featurizer_tf, featurizer_emb =  self.get_featurizers()
+        featurizer_tf = FeatureExtractor(mode="tfidf")
+        featurizer_emb = FeatureExtractor(mode="word-embeddings")
         sents_train = list(self.train_df["sent"])
         claims_train = list(self.train_df["claim"])
-        X_train = self.get_feature_union(sents_train, claims_train, self.tok_driver, 
+        X_train = self.get_feature_union(sents_train, claims_train, 
                                              featurizer_emb, featurizer_tf, mode="train")
         self.set_featurizers(featurizer_tf, featurizer_emb)
-
+        print("training for user study. Shape of training data: ", X_train.shape)
         for _, task in self.classification_tasks_dict.items():
             print("Training classifier for task: {}".format(task.name))
             
@@ -169,11 +169,11 @@ class ClassificationStep:
         self.train_df, self.val_df = self.get_train_val_test_splits(self.complete_df, train_frac=train_frac)
         sents_train = list(self.train_df["sent"])
         claims_train = list(self.train_df["claim"])
-        X_train = self.get_feature_union(sents_train, claims_train, self.tok_driver, 
+        X_train = self.get_feature_union(sents_train, claims_train, 
                                              featurizer_emb, featurizer_tf, mode="train")
         sents_val = list(self.val_df["sent"])
         claims_val = list(self.val_df["claim"])
-        X_val = self.get_feature_union(sents_val, claims_val, self.tok_driver, featurizer_emb,
+        X_val = self.get_feature_union(sents_val, claims_val, featurizer_emb,
                                         featurizer_tf, mode="test")
         
         for _, task in self.classification_tasks_dict.items():
@@ -220,12 +220,12 @@ class ClassificationStep:
 
         sents_train = list(self.train_df["sent"])
         claims_train = list(self.train_df["claim"])
-        X_train = self.get_feature_union(sents_train, claims_train, self.tok_driver, 
+        X_train = self.get_feature_union(sents_train, claims_train,
                                              featurizer_emb, featurizer_tf, mode="train")
         print("retraining with train size: ", len(self.train_df))
         sents_val = list(self.val_df["sent"])
         claims_val = list(self.val_df["claim"])
-        X_val = self.get_feature_union(sents_val, claims_val, self.tok_driver, featurizer_emb,
+        X_val = self.get_feature_union(sents_val, claims_val, featurizer_emb,
                                         featurizer_tf, mode="test")
         
         self.set_featurizers(featurizer_tf, featurizer_emb)
@@ -268,11 +268,14 @@ class ClassificationStep:
         # get columns from the properties of a claim
         if len(claims_list) > 0:
             cols = list(claims_list[0].convert_to_pandas_row().keys())
+        else:
+            print("Empty list")
+            return pd.DataFrame()
         ret_df = pd.DataFrame(columns=cols)
         for claim in claims_list:
             row_dict = claim.convert_to_pandas_row()
             ret_df = ret_df.append(row_dict,  ignore_index=True)
-        print("successfully added {} new data points".format(len(ret_df)))
+        print("successfully transformed {} new data points".format(len(ret_df)))
 
         return ret_df
 
@@ -312,15 +315,13 @@ class ClassificationStep:
             features_s = features_s.toarray()
         return np.concatenate((features_s, features_c), axis=1)
 
-    def get_feature_union(self, sents, claims, tokenizer, featurizer_emb, featurizer_tf, mode="train"):
-        tokenized_sents = tokenizer.tokenize_data(sents)
-        tokenized_claims = tokenizer.tokenize_data(claims)
+    def get_feature_union(self, sents, claims, featurizer_emb, featurizer_tf, mode="train"):
         if mode == "train":
-            features_sents = featurizer_emb.featurize_train(tokenized_sents)
-            features_claims = featurizer_tf.featurize_train(tokenized_claims)
+            features_sents = featurizer_emb.featurize_train(sents)
+            features_claims = featurizer_tf.featurize_train(claims)
         else:
-            features_sents = featurizer_emb.featurize_test(tokenized_sents)
-            features_claims = featurizer_tf.featurize_test(tokenized_claims)
+            features_sents = featurizer_emb.featurize_test(sents)
+            features_claims = featurizer_tf.featurize_test(claims)
         features_union = self.concat_features(features_sents, features_claims)
         # print("training features extracted")
         # print("Sentence features shape: {}".format(features_sents.shape))
