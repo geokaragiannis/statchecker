@@ -13,8 +13,6 @@ class ClusteringStep:
     def __init__(self, num_clusters=10):
         self.num_clusters = num_clusters
         self.config = helpers.load_yaml("src/config.yml")
-
-        self.tok_driver = TokenizerDriver()
         # common featurizer objects for all tasks
         self.featurizer_tf = None
         self.featurizer_emb = None
@@ -38,7 +36,7 @@ class ClusteringStep:
         featurizer_tf, featurizer_emb =  self.get_featurizers()
         sents = list(df["sent"])
         claims = list(df["claim"])
-        X = self.get_feature_union(sents, claims, self.tok_driver, 
+        X = self.get_feature_union(sents, claims,
                                    featurizer_emb, featurizer_tf, mode="train")
         return self.clusterer.get_clusters(X)
 
