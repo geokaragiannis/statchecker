@@ -6,13 +6,15 @@ from src.crowdsourcing.property import Property
 from src.crowdsourcing.value import Value
 from colorama import Fore, Style
 import math
+import pandas as pd
 
 
 DATA_PATH = "data/claims_01-23-2020/"
 class Simulation:
-    def __init__(self, class_pipeline, opt_pipeline):
+    def __init__(self, class_pipeline, opt_pipeline, active_pipeline):
         self.classification_pipeline = class_pipeline
         self.optimization_pipeline = opt_pipeline
+        self.active_pipeline = active_pipeline
         self.z = 0
 
     def create_claims_from_df(self, test_df, get_preds=False, get_ground_truth=False):
@@ -43,7 +45,7 @@ class Simulation:
             featurizer_tf = prop.task.featurizer_tf
             featurizer_emb = prop.task.featurizer_emb
             classifier = prop.task.classifier
-            features = self.classification_pipeline.get_feature_union([claim.sent], [claim.claim], self.classification_pipeline.tok_driver, 
+            features = self.classification_pipeline.get_feature_union([claim.sent], [claim.claim],
                                                            featurizer_emb, featurizer_tf, mode="test")
             pred_labels, pred_probs = classifier.predict_utt_top_n(features, n=5)
             if prop.property_name == "template_formula":
@@ -59,6 +61,13 @@ class Simulation:
             prop.candidate_values = values_list
         
         self.z += not_found_hash
+
+    def get_features_from_claim_list(self, claims):
+        feat_tf = self.classification_pipeline.featurizer_tf
+        feat_emb = self.classification_pipeline.featurizer_emb
+        sents = [claim.sent for claim in claims]
+        claims = [claim.claim for claim in claims]
+        return self.classification_pipeline.get_feature_union(sents, claims, feat_emb, feat_tf, mode="test")
 
     def ask_questions_about_claim(self, claim, test_df_row):
         print(Fore.RED + ">> Sentence: {}".format(claim.sent))
@@ -91,7 +100,7 @@ class Simulation:
                 print("\t Value: {}, Prob: {}".format(val.value, val.prob))
             print("Entropy: ", prop.entropy)
 
-    def get_cost_of_claim_from_preds(self, claim):
+    def get_cost_of_claim_from_preds(self, claim, acc_dict):
         cost = 0
         for prop in claim.available_properties:
             # find index of ground_truth in the preds. If not found, count it as a derivation cost
@@ -101,16 +110,30 @@ class Simulation:
                 idx = cand_values_str.index(prop.ground_truth)
                 cost += (idx+1)*prop.task.ver_cost
                 prop.verified_index = idx
+                acc_dict[prop.property_name][0] += 1
             except ValueError:
                 # derivation
                 # print("prop: {}, preds: {}".format(prop.property_name, cand_values_str))
                 # print("ground_truth: ", prop.ground_truth)
                 cost += len(cand_values_str)*prop.task.ver_cost + prop.task.der_cost
                 prop.verified_index = -1
+                acc_dict[prop.property_name][1] += 1
         # self.print_preds(claim)
         return cost
+    
+    def get_init_training_cost(self, train_df):
+        """
+        Here, we don't have trained models, so we derive everything.
+        cost is num_claims * sum(der_cost of properties)
+        """
+        claims = self.create_claims_from_df(train_df)
+        cost = 0
+        if len(claims) == 0:
+            return cost
+        cost = sum([prop.task.der_cost for prop in claims[0].available_properties])
+        return len(claims) * cost
 
-    def get_cost_random_order_opt(self, test_df):
+    def get_cost_sequential_order_opt(self, test_df):
         """
         Assuming that we have a trained model, go through the test claims, get the predictions
         and calculate the actual cost. We use the optimization to get the number of predictions
@@ -120,11 +143,122 @@ class Simulation:
         """
         # claims without preds with the groundtruth
         claims = self.create_claims_from_df(test_df, get_ground_truth=True)
+        print("optimizing over {} claims".format(len(claims)))
+        features_list = self.get_features_from_claim_list(claims)
+        print("extracted {} number of features".format(len(features_list)))
         total_cost = 0
-        for claim in claims:
-            self.optimization_pipeline.optimize_claim(claim)
-            total_cost += self.get_cost_of_claim_from_preds(claim)
-        return total_cost, claims
+        acc_dict = dict()
+        for task_name, task in self.classification_pipeline.classification_tasks_dict.items():
+            acc_dict[task_name] = [0,0]
+        for features, claim in zip(features_list, claims):
+            self.optimization_pipeline.optimize_claim(claim, features.reshape(1,-1))
+            total_cost += self.get_cost_of_claim_from_preds(claim, acc_dict)
+        return total_cost, claims, acc_dict
+
+    def get_cost_milp_opt(self, test_claims):
+        """
+        Here we have preds for all the claims and we just get the cost
+        Arguments:
+            test_claims {list of Claims} -- [claims to be verified]
+        """
+        total_cost = 0
+        acc_dict = dict()
+        for task_name, task in self.classification_pipeline.classification_tasks_dict.items():
+            acc_dict[task_name] = [0,0]
+        for claim in test_claims:
+            total_cost += self.get_cost_of_claim_from_preds(claim, acc_dict)
+        return total_cost, acc_dict
+
+    def get_cost_sequential_order_opt_retraining(self, train_df, test_df, batch_idx_list):
+        """
+        Assuming that we have a trained model, go through the test claims, get the predictions
+        and calculate the actual cost and retrain. We use the optimization to get the number of predictions
+        and the subset of properties we ask about.
+        Arguments:
+            test_df {DataFrame} -- [claims to be verified]
+            batch_idx_list {list of ints} -- [i.e [20, 40, 60, 100]] are the sizes for each batch. 
+                                         Each element is an index of the dataframe
+        """
+        total_cost = self.get_init_training_cost(train_df)
+        print("init cost: ", total_cost)
+        all_claims = []
+        acc_list = []    
+        i = 0
+        for j in batch_idx_list:
+            next_k_df = test_df.iloc[i:j]
+            batch_cost, batch_claims, batch_acc_dict = self.get_cost_sequential_order_opt(next_k_df)
+            print("batch cost is {} for {} claims".format(batch_cost, len(batch_claims)))
+            for k, v in batch_acc_dict.items():
+                batch_acc_dict[k] = float(v[0]/(v[0]+v[1]))
+            batch_acc_dict["num_training_data"] = i+10
+            print("acc_dict: ", batch_acc_dict)
+            acc_list.append(batch_acc_dict)
+            total_cost += batch_cost
+            all_claims.extend(batch_claims)
+            # retrain classifiers using the next_k_df
+            new_train_df = pd.concat([self.classification_pipeline.train_df, next_k_df], 
+                                      axis=0, ignore_index=True, sort=False)
+            self.classification_pipeline.train_for_user_study(new_train_df)
+            i=j
+
+        print(acc_list)
+        return total_cost, all_claims
+
+    def _get_next_k_milp(self, test_df, k, skim_cost=5):
+        # claims without preds
+        claims = self.create_claims_from_df(test_df, get_ground_truth=True)
+        print("optimizing over {} claims".format(len(claims)))
+        features_list = self.get_features_from_claim_list(claims)
+        print("extracted {} number of features".format(len(features_list)))
+        for features, claim in zip(features_list, claims):
+            # gets preds
+            self.optimization_pipeline.optimize_claim(claim, features.reshape(1,-1))
+        # now we can get the next_k from milp
+        return self.active_pipeline.get_next_k_milp(claims, batch_size=k, skim_cost=skim_cost)
+
+    def get_cost_active_learning_milp_opt_retraining(self, train_df, test_df, batch_idx_list, skim_cost=5):
+        """
+        Assuming that we have a trained model, go through the test claims by selecting the next k by milp, 
+        get the predictions and calculate the actual cost and retrain. We use the optimization to get the number 
+        of predictions and the subset of properties we ask about.
+        Arguments:
+            test_df {DataFrame} -- [claims to be verified]
+            batch_idx_list {list of ints} -- [i.e [20, 40, 60, 100]] are the sizes for each batch. 
+                                         Each element is an index of the dataframe
+        """
+        total_cost = self.get_init_training_cost(train_df)
+        print("init cost: ", total_cost)
+        all_claims = []
+        i = 0
+        acc_list = []
+        for j in batch_idx_list:
+            num_next_k = j-i
+            next_k_claims = self._get_next_k_milp(test_df, num_next_k, skim_cost=skim_cost)
+            batch_cost, batch_acc_dict = self.get_cost_milp_opt(next_k_claims)
+            print("batch cost is {} for {} claims".format(batch_cost, len(next_k_claims)))
+            if j == 190:
+                for claim in next_k_claims[:1]:
+                    self.print_preds(claim)
+                    print("\n")
+            for k, v in batch_acc_dict.items():
+                batch_acc_dict[k] = float(v[0]/(v[0]+v[1]))
+            batch_acc_dict["num_training_data"] = len(train_df)
+            print("acc_dict: ", batch_acc_dict)
+            acc_list.append(batch_acc_dict)
+            total_cost += batch_cost
+            all_claims.extend(next_k_claims)
+            next_k_df = self.classification_pipeline.transform_claim_list_to_df(next_k_claims)
+            # remove the selected next_k_df from test_df
+            test_df = next_k_df.merge(test_df, how = 'outer', indicator=True).loc[lambda x : x['_merge']=='right_only']
+            test_df.drop(columns=["_merge"], inplace=True)
+            # retrain classifiers using the next_k_df
+            train_df = pd.concat([train_df, next_k_df], 
+                                      axis=0, ignore_index=True, sort=False)
+            self.classification_pipeline.train_for_user_study(train_df)
+            i=j
+
+        print("acc_list: ", acc_list)
+        return total_cost, all_claims
 
     def get_cost_random_order_only_verification(self, test_df):
         """
@@ -169,9 +303,9 @@ class Simulation:
                 self.classification_pipeline.retrain(claims_to_retrain)
                 claims_to_retrain = []
 
-if __name__ == "__main__":
-    class_pipeline = ClassificationStep(DATA_PATH, simulation=True, min_samples=1)
-    opt_pipeline = OptimizationStep(class_pipeline)
-    simulation = Simulation(class_pipeline, opt_pipeline)
-    simulation.run()
+# if __name__ == "__main__":
+#     class_pipeline = ClassificationStep(DATA_PATH, simulation=True, min_samples=1)
+#     opt_pipeline = OptimizationStep(class_pipeline)
+#     simulation = Simulation(class_pipeline, opt_pipeline)
+#     simulation.run()
 
