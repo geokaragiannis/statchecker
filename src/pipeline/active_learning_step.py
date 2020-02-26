@@ -8,14 +8,16 @@ from random import sample
 import pandas as pd
 import os
 import numpy as np
+import gurobipy as gp
+from gurobipy import GRB
 
 DATA_PATH = "data/claims_01-23-2020/"
 
 
 class ActiveLearningStep:
-    def __init__(self, data_path, num_clusters=10):
-        self.data_path = data_path
-        self.classification_pipeline = ClassificationStep(data_path, simulation=False, export=False)
+    def __init__(self, class_pipeline, num_clusters=10):
+        self.data_path = DATA_PATH
+        self.classification_pipeline = class_pipeline
         self.num_clusters = num_clusters
         self.clustering_pipeline = ClusteringStep(num_clusters=num_clusters)
         
@@ -54,7 +56,7 @@ class ActiveLearningStep:
         num_class_tasks = len(class_pipeline.classification_tasks_dict.items())
         # each row will have the first pred prob for each task. Each column is the task
         first_pred_matrix = np.zeros((len(df), num_class_tasks))
-        features = class_pipeline.get_feature_union(sents, claims, class_pipeline.tok_driver, 
+        features = class_pipeline.get_feature_union(sents, claims, 
                                                            featurizer_emb, featurizer_tf, mode="test")
         task_num = 0
         for task_name, task in class_pipeline.classification_tasks_dict.items():
@@ -324,6 +326,38 @@ class ActiveLearningStep:
         self.export_val_acc_list_to_csv(val_accuracy_list, os.path.join("data", "active_learning",
                                                                         "val_accuracy_list_random2.csv"))
         return val_accuracy_list
+
+
+    def get_next_k_milp(self, claims, skim_cost=5, batch_size=20):
+        """
+        Use mixed integer linear programming to get the next_k claims to test on
+        claims: list of Claim objects
+        """
+        if len(claims) <= batch_size:
+            return claims
+        subsections = list(set([claim.subsection for claim in claims]))
+        m = gp.Model("next_k_milp")
+        # binary variables for the claims and subsections. 1 --> we have selected the claim/subsection
+        # c and s are dicts, where they keys are the claim/sub and the values are the binary vars
+        # so c[claim_obj] or s["1.2.1"] will give you the binary var (0/1) for the specific claim/sub
+        c = m.addVars(claims, name="c", vtype=GRB.BINARY)
+        s = m.addVars(subsections, name="s", vtype=GRB.BINARY)
+        ver_cost_objective = sum(c[claim]*claim.expected_cost for claim in claims)
+        reading_cost_objective = sum(sub*skim_cost for sub in s.values())
+        uncertainty_objective = sum(c[claim]*claim.uncertainty for claim in claims)
+        objective = ver_cost_objective + reading_cost_objective - uncertainty_objective
+        m.setObjective(objective, GRB.MINIMIZE)
+        # add the constraints
+        m.addConstr(c.sum() == batch_size)
+        m.addConstrs(s[claim.subsection] >= c[claim] for claim in claims)
+        m.optimize()
+        next_k_claims = None
+        if m.status == GRB.OPTIMAL:
+            next_k_claims = m.getAttr("x", c)
+        else:
+            print("NOT OPTIMAL")
+        return [claim for claim, c in next_k_claims.items() if c == 1.0]
+
 
 
 if __name__ == "__main__":
