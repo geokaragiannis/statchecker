@@ -66,7 +66,7 @@ class Simulation:
         feat_tf = self.classification_pipeline.featurizer_tf
         feat_emb = self.classification_pipeline.featurizer_emb
         sents = [claim.sent for claim in claims]
-        claims = [claim.claim for claim in claims]
+        claims = [claim.claim + " " + claim.subsection for claim in claims]
         return self.classification_pipeline.get_feature_union(sents, claims, feat_emb, feat_tf, mode="test")
 
     def ask_questions_about_claim(self, claim, test_df_row):

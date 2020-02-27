@@ -131,7 +131,7 @@ class ClassificationStep:
         featurizer_tf = FeatureExtractor(mode="tfidf")
         featurizer_emb = FeatureExtractor(mode="word-embeddings")
         sents_train = list(self.train_df["sent"])
-        claims_train = list(self.train_df["claim"])
+        claims_train = list(self.train_df["claim"] + " " + self.train_df["subsection"])
         X_train = self.get_feature_union(sents_train, claims_train, 
                                              featurizer_emb, featurizer_tf, mode="train")
         self.set_featurizers(featurizer_tf, featurizer_emb)
