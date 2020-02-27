@@ -13,7 +13,8 @@ from src.table import Table
 logger = logging.getLogger(__name__)
 NLP = None
 CONTRAINT_FILE = "data/constraints_dicts"
-
+# doct which contains the constraint dicts
+constraint_dicts_dict = dict()
 
 def get_nlp():
     global NLP
@@ -111,31 +112,34 @@ def load_contraint_file(fname):
     return json.load(f)
     
 
-def get_possible_values(source_value, target_value):
+def get_constraint_dict(source_prop, target_prop):
     """
-    Returns a list of string values (not value objects), which
-    are possible to be obtained from the source_value.
-    For example if the source_value is of type "tab" with value "tab1" 
-    and the  target_value is of type "row_index" with value "row3", 
-    then we return all the values from the "tab2rowIndex.json" file for 
-    key="tab1". 
-    Arguments:
-        source_value {Value obj} -- [Value used as a key]
-        target_value {Value obj} -- [Value to be obtained]
-    Returns: list of strings or the empty list
+    Returns the constraint file for the given properties
+    or None if not found
     """
     constraint_file = None
-    source_property_name = source_value.property.property_name
-    target_property_name = target_value.property.property_name
+    source_property_name = source_prop.property_name
+    target_property_name = target_prop.property_name
     # hacky way to get the filename
     file_name = "2".join([source_property_name, target_property_name]) + ".json"
     constraint_file = os.path.join(CONTRAINT_FILE, file_name)
-    try:
-        f = open(constraint_file)
-    except FileNotFoundError:
-        # print("constraint file {} not found".format(constraint_file))
-        return []
+    if file_name in constraint_dicts_dict:
+        return constraint_dicts_dict[file_name]
+    else:
+        try:
+            f = open(constraint_file)
+        except FileNotFoundError:
+            # print("constraint file {} not found".format(constraint_file))
+            return None
     
     constraint_dict = json.load(f)
+    constraint_dicts_dict[file_name] = constraint_dict
     # return the list of possible value strings or the empty list, if not found
-    return constraint_dict.get(source_value.value, [])
+    return constraint_dict
+
+def value_meets_contraints(source_value, target_value):
+    """
+    Return true if the target value exists in the constraint files
+    """
+    
+    

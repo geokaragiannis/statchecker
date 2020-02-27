@@ -30,7 +30,7 @@ class OptimizationStep:
         max_properties_questions = self.get_max_num_properties_to_ask(lamda=4)
         self.get_preds_from_claim(claim, features)
         # use the preds and re-calculate topn and clip (if necessary) the extra preds
-        self.set_topn_entropy_and_clip_preds(claim)
+        # self.set_topn_entropy_and_clip_preds(claim)
         if max_properties_questions < len(claim.available_properties):
             num_properties_questions = max_properties_questions 
         else:
@@ -74,6 +74,54 @@ class OptimizationStep:
             prop.set_entropy()
         claim.set_uncertainty()
         claim.set_expected_cost()
+
+    def shrink_candidate_values_with_constraints(self, claim, target_prop):
+        """
+        For the given target property and possible values, exclude those values that do not meet the constraints 
+        from previous property preds. E.g If prop = "row_index" then each value should exist in the 
+        constraint files for file2row_index and tab2row_index. Note that the previous predicted properties 
+        should have a ground truth.
+        Arguments:
+            claim {Claim obj} -- [description]
+            target_prop {Property obj} -- [the property we want to exclude values from]
+            values)list {list of Values} -- [the predicted values for the target_property]
+        """
+        # probability mass excluded
+        extra_prob_mass = 0.0
+        for source_prop in claim.available_properties:
+            if source_prop.property_name == target_prop.property_name:
+                break
+            constraint_dict = helpers.get_constraint_dict(source_prop, target_prop)
+            if constraint_dict is None:
+                continue
+            # if target_prop.property_name == "row_index":
+            #     print("source: ", source_prop.property_name)
+            for value in target_prop.candidate_values:
+                # we only need one value to be (or not) in the constraints in order to include it (or not)
+                str_value = value.value.split("-")[0]
+                # find all the possible values from the ground truth. If we gen an empty list, we do not exclude the value
+                possible_values = self._get_possible_values(constraint_dict, source_prop.ground_truth)
+                if len(possible_values) > 0 and str_value not in possible_values:
+                    extra_prob_mass += value.prob
+                    value.exclude = True
+
+        if target_prop.property_name == "row_index":
+            for val in target_prop.candidate_values:
+                if val.exclude:
+                    if val.value == target_prop.ground_truth:
+                        print("\n\nooooooooooooopppppps\n\n")
+
+        #TODO: transfer prob mass from the excluded values to the remaining ones
+        target_prop.candidate_values = [value for value in target_prop.candidate_values if not value.exclude]
+
+    def _get_possible_values(self, constraint_dict, ground_truth):
+        """
+        get the possible values that the ground truth gives from the constraint_dict
+        """
+        ret_list = []
+        for t in ground_truth.split("-"):
+            ret_list.extend(constraint_dict.get(ground_truth, []))
+        return ret_list
 
     def set_topn(self, claim):
         """

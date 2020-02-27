@@ -101,8 +101,23 @@ class Simulation:
             print("Entropy: ", prop.entropy)
 
     def get_cost_of_claim_from_preds(self, claim, acc_dict):
+        """
+        For a given claim with preds, get the cost and accuracy across properties.
+        NOTE: we shrink the preds of some properties depending on previous ground truth
+        assignments. I.e remove impossible row_index predictions depending on file, tab and region
+        preds. This exclusion of preds is done BEFORE we clip the predictions according to entropy 
+        (or otherwise). So after that, we also run the last stage of the optimization pipeline, where
+        we clip the number of preds we show to the fact checkers.
+        """
         cost = 0
         for prop in claim.available_properties:
+            # remove impossible preds and clip preds according to the optimization pipeline
+            self.optimization_pipeline.shrink_candidate_values_with_constraints(claim, prop)
+            self.optimization_pipeline.set_topn_entropy_and_clip_preds(claim)            
+            # x2 = len(prop.candidate_values)
+            # if prop.property_name == "row_index":
+            #     print("num predicted valies values: ", x2)
+
             # find index of ground_truth in the preds. If not found, count it as a derivation cost
             cand_values_str = [v.value for v in prop.candidate_values]
             

@@ -110,11 +110,12 @@ class DatasetParser:
         self.formula_df = self.formula_df.drop_duplicates(subset=["sent", "claim"]).reset_index(drop=True)
         return self.formula_df
 
-    def decouple(self, row, item):
+    def decouple(self, row, task):
         """
         For the specified item (i.e row_index, year, tab, ...), return a set of all the mentioned items.
         Example return set("row_idx1", "row_idx2", "row_idx3") if the lookup_dict contains those 3 row_indexes
         """
+        item = task.init_name
         ret_set = set()
         try:
             row_dicts = json.loads(row["dicts"])
@@ -128,6 +129,8 @@ class DatasetParser:
                     ret_set.add(str(w).lower())
             elif item_value:
                 ret_set.add(str(item_value).lower())
+        if task.name == "file":
+            ret_set = set(task.normalize_files(list(ret_set)))
         return "-".join(sorted(ret_set)) if len(ret_set) > 0 else None
     
     def apply_hash(self, row, task):
@@ -146,7 +149,7 @@ class DatasetParser:
         df: dataframe which will be added a new column
         task: ClassificationTask obj 
         """
-        df[task.name] = df.apply(self.decouple, item=task.init_name, axis=1)
+        df[task.name] = df.apply(self.decouple, task=task, axis=1)
         # add a new column which has the hash value of df[column]
         # if column is "row_index", then create "row_index_hash" as the new hash column
         df[task.hash_name] = df.apply(self.apply_hash, task=task, axis=1)

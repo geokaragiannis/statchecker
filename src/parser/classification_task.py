@@ -64,13 +64,13 @@ class ClassificationTask:
         Arguments:
             df_column_list {list} -- [list of strings]
         """
-        if self.name == "file":
-            for val in df_column_list:
-                normalized_files = self.normalize_files(val.split("-"))
-                self.all_values.update(normalized_files)
-        else:
-            for val in df_column_list:
-                self.all_values.update(val.split("-"))
+        # if self.name == "file":
+        #     for val in df_column_list:
+        #         normalized_files = self.normalize_files(val.split("-"))
+        #         self.all_values.update(normalized_files)
+        # else:
+        for val in df_column_list:
+            self.all_values.update(val.split("-"))
 
     def normalize_files(self, file_list):
         normalized_list = []
