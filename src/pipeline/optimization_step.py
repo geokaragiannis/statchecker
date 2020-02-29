@@ -105,11 +105,11 @@ class OptimizationStep:
                     extra_prob_mass += value.prob
                     value.exclude = True
 
-        if target_prop.property_name == "row_index":
-            for val in target_prop.candidate_values:
-                if val.exclude:
-                    if val.value == target_prop.ground_truth:
-                        print("\n\nooooooooooooopppppps\n\n")
+        # if target_prop.property_name == "row_index":
+        #     for val in target_prop.candidate_values:
+        #         if val.exclude:
+        #             if val.value == target_prop.ground_truth:
+        #                 print("\n\nooooooooooooopppppps\n\n")
 
         #TODO: transfer prob mass from the excluded values to the remaining ones
         target_prop.candidate_values = [value for value in target_prop.candidate_values if not value.exclude]

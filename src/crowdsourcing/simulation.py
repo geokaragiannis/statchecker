@@ -205,15 +205,15 @@ class Simulation:
             print("batch cost is {} for {} claims".format(batch_cost, len(batch_claims)))
             for k, v in batch_acc_dict.items():
                 batch_acc_dict[k] = float(v[0]/(v[0]+v[1]))
-            batch_acc_dict["num_training_data"] = i+10
+            batch_acc_dict["num_training_data"] = len(train_df)
+            batch_acc_dict["batch_cost"] = round(batch_cost,2)
             print("acc_dict: ", batch_acc_dict)
             acc_list.append(batch_acc_dict)
             total_cost += batch_cost
             all_claims.extend(batch_claims)
             # retrain classifiers using the next_k_df
-            new_train_df = pd.concat([self.classification_pipeline.train_df, next_k_df], 
-                                      axis=0, ignore_index=True, sort=False)
-            self.classification_pipeline.train_for_user_study(new_train_df)
+            train_df = pd.concat([train_df, next_k_df], axis=0, ignore_index=True, sort=False)
+            self.classification_pipeline.train_for_user_study(train_df)
             i=j
 
         print(acc_list)
@@ -258,6 +258,7 @@ class Simulation:
             for k, v in batch_acc_dict.items():
                 batch_acc_dict[k] = float(v[0]/(v[0]+v[1]))
             batch_acc_dict["num_training_data"] = len(train_df)
+            batch_acc_dict["batch_cost"] = round(batch_cost,2)
             print("acc_dict: ", batch_acc_dict)
             acc_list.append(batch_acc_dict)
             total_cost += batch_cost
@@ -267,8 +268,7 @@ class Simulation:
             test_df = next_k_df.merge(test_df, how = 'outer', indicator=True).loc[lambda x : x['_merge']=='right_only']
             test_df.drop(columns=["_merge"], inplace=True)
             # retrain classifiers using the next_k_df
-            train_df = pd.concat([train_df, next_k_df], 
-                                      axis=0, ignore_index=True, sort=False)
+            train_df = pd.concat([train_df, next_k_df], axis=0, ignore_index=True, sort=False)
             self.classification_pipeline.train_for_user_study(train_df)
             i=j
 

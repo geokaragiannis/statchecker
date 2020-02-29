@@ -74,8 +74,8 @@ complete_df = class_step.parser.get_complete_df()
 # # print(len(complete_df) == len(train_df))
 # sim_obj = Simulation(class_step, opt_step)
 
-cold_exp_sequential(complete_df, class_step)
-# cold_exp_active_learning_milp(complete_df, class_step)
+# cold_exp_sequential(complete_df, class_step)
+cold_exp_active_learning_milp(complete_df, class_step)
 # cost_opt, claims = sim_obj.get_cost_random_order_opt(test_df)
 # print("cost from random order using opt: ", cost_opt)
 
