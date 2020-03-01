@@ -9,6 +9,8 @@ class Claim:
         self.subsection = subsection
         self.expected_cost = 0.0
         self.real_cost = 0.0
+        # average accuracy of classifiers for this specific claim. Accuracy is 1 if ground truth of claim in in topn
+        self.avg_class_accuracy = 0.0
         # list of Property objects, which are relevant for this claim
         self.available_properties = available_properties
         self.verification_cost = ver_cost

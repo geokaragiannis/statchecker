@@ -7,6 +7,7 @@ from src.crowdsourcing.value import Value
 from colorama import Fore, Style
 import math
 import pandas as pd
+import time
 
 
 DATA_PATH = "data/claims_01-23-2020/"
@@ -110,6 +111,7 @@ class Simulation:
         we clip the number of preds we show to the fact checkers.
         """
         cost = 0
+        num_correct_class_preds = 0
         for prop in claim.available_properties:
             # remove impossible preds and clip preds according to the optimization pipeline
             self.optimization_pipeline.shrink_candidate_values_with_constraints(claim, prop)
@@ -124,16 +126,18 @@ class Simulation:
             try:
                 idx = cand_values_str.index(prop.ground_truth)
                 cost += (idx+1)*prop.task.ver_cost
+                num_correct_class_preds += 1
                 prop.verified_index = idx
                 acc_dict[prop.property_name][0] += 1
             except ValueError:
                 # derivation
-                # print("prop: {}, preds: {}".format(prop.property_name, cand_values_str))
-                # print("ground_truth: ", prop.ground_truth)
                 cost += len(cand_values_str)*prop.task.ver_cost + prop.task.der_cost
                 prop.verified_index = -1
                 acc_dict[prop.property_name][1] += 1
-        # self.print_preds(claim)
+                
+        claim.real_cost = cost
+        # % of classifiers that had a correct prediction in the topn
+        claim.avg_class_accuracy = float(num_correct_class_preds/len(claim.available_properties))
         return cost
     
     def get_init_training_cost(self, train_df):
@@ -199,7 +203,10 @@ class Simulation:
         all_claims = []
         acc_list = []    
         i = 0
+        opt_time = 0.0
+        retrain_time = 0.0
         for j in batch_idx_list:
+            start_opt_time = time.time()
             next_k_df = test_df.iloc[i:j]
             batch_cost, batch_claims, batch_acc_dict = self.get_cost_sequential_order_opt(next_k_df)
             print("batch cost is {} for {} claims".format(batch_cost, len(batch_claims)))
@@ -210,13 +217,20 @@ class Simulation:
             print("acc_dict: ", batch_acc_dict)
             acc_list.append(batch_acc_dict)
             total_cost += batch_cost
+            end_opt_time = time.time()
+            opt_time += (end_opt_time - start_opt_time)
+            start_retrain_time = time.time()
             all_claims.extend(batch_claims)
             # retrain classifiers using the next_k_df
             train_df = pd.concat([train_df, next_k_df], axis=0, ignore_index=True, sort=False)
             self.classification_pipeline.train_for_user_study(train_df)
+            end_retrain_time = time.time()
+            retrain_time += (end_retrain_time - start_retrain_time)
             i=j
 
         print(acc_list)
+        print("\n overall opt time: ", opt_time)
+        print("\n overall retrain time: ", retrain_time)
         return total_cost, all_claims
 
     def _get_next_k_milp(self, test_df, k, skim_cost=5):
@@ -246,15 +260,14 @@ class Simulation:
         all_claims = []
         i = 0
         acc_list = []
+        opt_time = 0.0
+        retrain_time = 0.0
         for j in batch_idx_list:
             num_next_k = j-i
+            start_opt_time = time.time()
             next_k_claims = self._get_next_k_milp(test_df, num_next_k, skim_cost=skim_cost)
             batch_cost, batch_acc_dict = self.get_cost_milp_opt(next_k_claims)
             print("batch cost is {} for {} claims".format(batch_cost, len(next_k_claims)))
-            if j == 190:
-                for claim in next_k_claims[:1]:
-                    self.print_preds(claim)
-                    print("\n")
             for k, v in batch_acc_dict.items():
                 batch_acc_dict[k] = float(v[0]/(v[0]+v[1]))
             batch_acc_dict["num_training_data"] = len(train_df)
@@ -262,6 +275,9 @@ class Simulation:
             print("acc_dict: ", batch_acc_dict)
             acc_list.append(batch_acc_dict)
             total_cost += batch_cost
+            end_opt_time = time.time()
+            opt_time += (end_opt_time - start_opt_time)
+            start_retrain_time = time.time()
             all_claims.extend(next_k_claims)
             next_k_df = self.classification_pipeline.transform_claim_list_to_df(next_k_claims)
             # remove the selected next_k_df from test_df
@@ -270,9 +286,13 @@ class Simulation:
             # retrain classifiers using the next_k_df
             train_df = pd.concat([train_df, next_k_df], axis=0, ignore_index=True, sort=False)
             self.classification_pipeline.train_for_user_study(train_df)
+            end_retrain_time = time.time()
+            retrain_time += (end_retrain_time - start_retrain_time)
             i=j
 
         print("acc_list: ", acc_list)
+        print("\n overall opt time: ", opt_time)
+        print("\n overall retrain time: ", retrain_time)
         return total_cost, all_claims
 
     def get_cost_random_order_only_verification(self, test_df):

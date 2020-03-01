@@ -9,6 +9,7 @@ from src.pipeline.active_learning_step import ActiveLearningStep
 from src.pipeline.optimization_step import OptimizationStep
 from src.crowdsourcing.simulation import Simulation
 import json
+import time
 
 def get_stats(claims, stats_dict):
     for claim in claims:
@@ -24,6 +25,14 @@ def get_stats(claims, stats_dict):
             # stats_dict["all_props"][prop.verified_index] += 1
     print(json.dumps(stats_dict))
 
+
+def export_claims_preds(claims_list):
+    export_list = []
+    for claim in claims_list:
+        export_list.append({"cost": claim.real_cost, "avg_property_classifier_acc": claim.avg_class_accuracy})
+    df = pd.DataFrame(export_list)
+    df.to_csv("data/milp_acc_vs_cost_all_claims.csv")
+
 def cold_exp_sequential(complete_df, class_step):
     print("SEQUENTIAL\n")
     complete_df = complete_df.sort_values(by="subsection")
@@ -31,12 +40,15 @@ def cold_exp_sequential(complete_df, class_step):
     train_df = complete_df.iloc[:10]
     test_df = complete_df[10:]
     batch_idx_list = [90, 190, 290, 390, 490, 590, 690, 790, 890, 990, 1090, 1190, 1290, 1390, 1490, len(test_df)]
+    start_time = time.time()
     class_step.train_for_user_study(train_df)
     opt_step = OptimizationStep(class_step)
     active_step = ActiveLearningStep(class_step)
     sim_obj = Simulation(class_step, opt_step, active_step)
     cost, claims = sim_obj.get_cost_sequential_order_opt_retraining(train_df, test_df, batch_idx_list)
     print("cost from sequential order using opt and retraining: ", cost)
+    end_time = time.time()
+    print("\nOVERALL TIME: ", end_time-start_time)
 
 
 def cold_exp_active_learning_milp(complete_df, class_step):
@@ -46,6 +58,7 @@ def cold_exp_active_learning_milp(complete_df, class_step):
     train_df = complete_df.iloc[:10]
     test_df = complete_df[10:]
     batch_idx_list = [90, 190, 290, 390, 490, 590, 690, 790, 890, 990, 1090, 1190, 1290, 1390, 1490, len(test_df)]
+    start_time = time.time()
     class_step.train_for_user_study(train_df)
     opt_step = OptimizationStep(class_step)
     active_step = ActiveLearningStep(class_step)
@@ -54,81 +67,14 @@ def cold_exp_active_learning_milp(complete_df, class_step):
     print("skim cost: ", skim_cost)
     cost, claims = sim_obj.get_cost_active_learning_milp_opt_retraining(train_df, test_df, batch_idx_list, skim_cost=skim_cost)
     print("cost from milp using opt and retraining: ", cost)
+    end_time = time.time()
+    print("\nOVERALL TIME: ", end_time-start_time)
+    export_claims_preds(claims)
 
 
 class_step = ClassificationStep(DATA_PATH, simulation=False, export=False)
 complete_df = class_step.parser.get_complete_df()
 
-# create a test dataframe
-# test_df = complete_df.sample(n=100, random_state=1)
-
-# remove the claims selected for testing
-# complete_df = test_df.merge(complete_df, how = 'outer', indicator=True).loc[lambda x : x['_merge']=='right_only']
-# complete_df.drop(columns=["_merge"], inplace=True)
-# train
-# class_step.train_for_user_study(complete_df)
-# load
-# class_step.load_models()
-# train_df, _, _ = class_step.load_dfs()
-# opt_step = OptimizationStep(class_step)
-# # print(len(complete_df) == len(train_df))
-# sim_obj = Simulation(class_step, opt_step)
 
 # cold_exp_sequential(complete_df, class_step)
 cold_exp_active_learning_milp(complete_df, class_step)
-# cost_opt, claims = sim_obj.get_cost_random_order_opt(test_df)
-# print("cost from random order using opt: ", cost_opt)
-
-# batch_idx_list = [20, 40, 60, 80, 100]
-# cost_opt_retraining, claims = sim_obj.get_cost_sequential_order_opt_retraining(test_df, batch_idx_list)
-# print("cost from random order using opt and retraining: ", cost_opt_retraining)
-
-# active_learning = ActiveLearningStep(DATA_PATH)
-# next_k_claims = active_learning.get_next_k_milp(claims)
-# print("len next k claims: ", len(next_k_claims))
-# for claim in next_k_claims:
-#     print("Sent: ", claim.sent)
-#     print("Subsection: ", claim.subsection)
-#     print("Expected Cost: ", claim.expected_cost)
-#     print("Uncertainty: ", claim.uncertainty)
-#     print("-----\n\n-----")
-
-# cost_ver_only, claims = sim_obj.get_cost_random_order_only_verification(test_df)
-# print("cost from random order using verification only: ", cost_ver_only)
-
-# stats_dict = dict()
-# topn = 5
-# for task_name, task in class_step.classification_tasks_dict.items():
-#     topn = task.topn
-#     stats_dict[task_name] = {"num": [0]*(task.topn+1), "mean_prob_der": [0]*(task.topn+1), "mean_prob_ver": [0]*(task.topn+1)}
-# stats_dict["all_props"] = [0]*(topn+1)
-
-# get_stats(claims, stats_dict)
-
-# complete_df.to_csv("data/simulation_train.csv")
-# test_df.to_csv("data/simulation_test.csv")
-
-# all_values_dict = dict()
-# for task_name, task in class_step.classification_tasks_dict.items():
-#     all_values_dict[task_name] = set()
-
-# for idx, row in complete_df.iterrows():
-#     for task_name, task in class_step.classification_tasks_dict.items():
-#         all_values_dict[task_name].add(row[task_name])
-
-# l = len(test_df)
-# i = 0.0
-# j = 0.0
-
-# for idx, row in test_df.iterrows():
-#     for task_name, task in class_step.classification_tasks_dict.items():
-#         if row[task_name] in all_values_dict[task_name]:
-#             i += 1
-#         else:
-#             j += 1
-#             print("index: {}, task: {}".format(idx, task_name))
-
-# print("len test_df: ", l)
-# print("len of props: ", len(class_step.classification_tasks_dict))
-# print("in: ", i)
-# print("out: ", j)
