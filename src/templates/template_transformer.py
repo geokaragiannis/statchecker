@@ -114,11 +114,22 @@ class TemplateTransformer:
         template_formula = self.remove_file_reference(template_formula)
         return template_formula
 
+    def get_formula_complexity(self, row):
+        formula = row.extended_formula
+        cell_references = re.findall(self.regex_obj.formula_regex, formula)
+        ref_vars_dict = self.get_variables_for_formula(cell_references, self.variables_list)
+        num_vars = len(ref_vars_dict.values())
+        template_formula = row.template_formula
+        num_ops = len(re.findall(self.regex_obj.ops_regex, template_formula))
+        num_consts = len(re.findall(self.regex_obj.numerical_const_regex, template_formula))
+        return num_vars + num_ops + num_consts
+
     def transform_formula_df(self):
         """
         Transforms self.df by creating templates for the formulas in an extra column called `template_formula`
         returns a Dataframe with this extra column
         """
         self.df["template_formula"] = self.df.apply(self.create_template_formulas, axis=1)
+        self.df["template_formula_complexity"] = self.df.apply(self.get_formula_complexity, axis=1)
         return self.df
 

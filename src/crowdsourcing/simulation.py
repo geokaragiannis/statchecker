@@ -34,6 +34,8 @@ class Simulation:
             test_claim = Claim(test_row["sent"], test_row["claim"], test_row["subsection"], available_properties)
             if get_preds:
                 self.get_preds_from_claim(test_claim)
+                
+            test_claim.set_complexity(test_row)
             test_claims.append(test_claim)
         return test_claims
 

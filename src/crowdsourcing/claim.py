@@ -1,5 +1,6 @@
 import src.helpers as helpers
 import numpy as np
+from scipy.stats import entropy
 
 
 class Claim:
@@ -11,12 +12,23 @@ class Claim:
         self.real_cost = 0.0
         # average accuracy of classifiers for this specific claim. Accuracy is 1 if ground truth of claim in in topn
         self.avg_class_accuracy = 0.0
+        # complexity of the claim ( = num_rows+num_cols+num_vars+num_ops+num_consts)
+        self.complexity = None
         # list of Property objects, which are relevant for this claim
         self.available_properties = available_properties
         self.verification_cost = ver_cost
         self.derivation_cost = der_cost
         self.uncertainty = None
 
+    def set_complexity(self, df_row):
+        """
+        Sets the complexity from the dataframe
+        df_row: dict with keys the properties
+        """
+        len_row_index = len(df_row["row_index"].split("-"))
+        len_columns = len(df_row["column"].split("-"))
+        template_complexity = df_row["template_formula_complexity"]
+        self.complexity = len_row_index + len_columns + template_complexity
 
     def set_uncertainty(self):
         """
@@ -24,22 +36,25 @@ class Claim:
         Define uncertainty as the average of preds across tasks
         """
         u = 0.0
+        # for prop in self.available_properties:
+        #     u += np.sum([v.prob for v in prop.candidate_values])/len(prop.candidate_values)
+        # self.uncertainty = 1 - u/len(self.available_properties)
         for prop in self.available_properties:
-            u += np.sum([v.prob for v in prop.candidate_values])/len(prop.candidate_values)
-        self.uncertainty = 1 - u/len(self.available_properties)
+            u += entropy([v.prob for v in prop.candidate_values], base=10)
+        self.uncertainty = u/len(self.available_properties)
 
     def set_expected_cost(self):
         """
         the expected cost per propery is calculated as:
-        \sum_{i=1}^{num_preds} p_i * Ver_cost_i * \prod_{j=1}^{i} (1-p_j) + \prod_{i=1}^{num_preds} (1-p_i) Der_cost_i
+        \sum_{i=1}^{num_preds} p_i * Ver_cost_i * \sum_{j=1}^{i} (1-p_j) + \sum_{i=1}^{num_preds} (1-p_i) Der_cost_i
         """
         cost = 0.0
         for prop in self.available_properties:
             ver_cost = prop.task.ver_cost
             cand_values_prob = np.array([v.prob for v in prop.candidate_values])
-            cost += np.sum([p*ver_cost*np.prod(1 - cand_values_prob[:i]) 
+            cost += np.sum([p*ver_cost*np.sum(1 - cand_values_prob[:i]) 
                         for i,p in enumerate(cand_values_prob)])
-            cost += np.prod(1 - cand_values_prob)*prop.task.der_cost
+            cost += np.sum(1 - cand_values_prob)*prop.task.der_cost
         self.expected_cost = cost
 
 

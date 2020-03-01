@@ -5,48 +5,48 @@ classification_tasks:
         hash_name: "row_index_hash"
         label_task: "multi-label"
         priority: 3
-        verification_cost: 1
-        derivation_cost: 5
+        verification_cost: 0.1
+        derivation_cost: 10
     file:
         init_name: "path"
         name: "file"
         hash_name: "file_hash"
         label_task: "multi-label"
         priority: 0
-        verification_cost: 1
-        derivation_cost: 5
+        verification_cost: 0.1
+        derivation_cost: 10
     column:
         init_name: "year"
         name: "column"
         hash_name: "column_hash"
         label_task: "multi-label"
         priority: 4
-        verification_cost: 1
-        derivation_cost: 5
-    # region:
-    #     init_name: "region"
-    #     name: "region"
-    #     hash_name: "region_hash"
-    #     label_task: "multi-label"
-    #     priority: 2
-    #     verification_cost: 1
-    #     derivation_cost: 5
-    # tab:
-    #     init_name: "tab"
-    #     name: "tab"
-    #     hash_name: "tab_hash"
-    #     label_task: "multi-label"
-    #     priority: 1
-    #     verification_cost: 1
-    #     derivation_cost: 5
+        verification_cost: 0.1
+        derivation_cost: 10
+    region:
+        init_name: "region"
+        name: "region"
+        hash_name: "region_hash"
+        label_task: "multi-label"
+        priority: 2
+        verification_cost: 0.1
+        derivation_cost: 10
+    tab:
+        init_name: "tab"
+        name: "tab"
+        hash_name: "tab_hash"
+        label_task: "multi-label"
+        priority: 1
+        verification_cost: 0.1
+        derivation_cost: 10
     template_formula:
         init_name: "Calculation Equation"
         name: "template_formula"
         hash_name: "template_formula"
         label_task: "single-label"
         priority: 5
-        verification_cost: 4
-        derivation_cost: 20
+        verification_cost: 0.1
+        derivation_cost: 10
 
 models_dir: "data/exported_models/"
 data_dir: "data/exported_data/"

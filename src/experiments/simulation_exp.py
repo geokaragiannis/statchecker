@@ -29,9 +29,9 @@ def get_stats(claims, stats_dict):
 def export_claims_preds(claims_list):
     export_list = []
     for claim in claims_list:
-        export_list.append({"cost": claim.real_cost, "avg_property_classifier_acc": claim.avg_class_accuracy})
+        export_list.append({"cost": claim.real_cost, "avg_property_classifier_acc": claim.avg_class_accuracy, "complexity": claim.complexity})
     df = pd.DataFrame(export_list)
-    df.to_csv("data/milp_acc_vs_cost_all_claims.csv")
+    df.to_csv("data/milp_acc_vs_cost_complexity_all_claims.csv")
 
 def cold_exp_sequential(complete_df, class_step):
     print("SEQUENTIAL\n")
