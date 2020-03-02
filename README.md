@@ -4,7 +4,7 @@
 
 Data have been removed from the repo due to sensitivity reasons. Please contact us for more information.
 
-Tested with `Python 3.5.6`
+Tested with `Python 3.5.6` and `Python 3.7.1`
 
 ## Template and row_index predictions
 
