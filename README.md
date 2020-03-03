@@ -1,4 +1,4 @@
-# IEA factchecking project
+# Stat claims factchecking project
 
 ### Note!!
 
