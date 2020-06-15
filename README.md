@@ -1,5 +1,5 @@
 # Stat claims factchecking project
-
+The paper can be found directly in the repo under the name **Scrutinizer_TR.pdf**.
 ### Note!!
 
 Data have been removed from the repo due to sensitivity reasons. Please contact us for more information.
